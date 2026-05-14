@@ -12,7 +12,7 @@
 
 <img width="1068" height="304" alt="image" src="https://github.com/user-attachments/assets/0fcd0efe-715b-4532-bf2c-47f2fb58fb76" />
 
-## 二、复现指标（实测）
+## 二、实测指标
 
 测试硬件：NVIDIA RTX 4060 Laptop GPU (8GB)、CUDA 12.6、PyTorch 2.2.1。  
 输入张量：(B=1, C=20, H=384, W=640)（IMX636 1280×720 → 下采样 2× → pad 到 64 倍数）。
