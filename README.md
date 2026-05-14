@@ -10,6 +10,8 @@
 
 <img width="502" height="220" alt="image" src="https://github.com/user-attachments/assets/2361291f-a5f4-421a-bb9f-7beda5ae5fb2" />
 
+<img width="1068" height="304" alt="image" src="https://github.com/user-attachments/assets/0fcd0efe-715b-4532-bf2c-47f2fb58fb76" />
+
 ## 二、复现指标（实测）
 
 测试硬件：NVIDIA RTX 4060 Laptop GPU (8GB)、CUDA 12.6、PyTorch 2.2.1。  
