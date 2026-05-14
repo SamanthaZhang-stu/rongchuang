@@ -5,19 +5,10 @@
 **项目硬件**：
 - 传感器：Sony / Prophesee **IMX636** (Gen4 HD，1280×720)
 - 主处理器：算能 CV184XH（INT8 算力预算 **1.5 TOPS**）
-- 项目计划的部署网络：**YOLOv8n-EV**（4 通道事件张量 + 环境状态调制 + 标准 YOLO 头）
 
-## 一、模型选型：RVT-S（uzh-rpg/RVT，CVPR 2023）
+## 一、模型选型：RVT-S
 
-广泛搜罗后的候选见 [docs/CANDIDATES.md](#一附候选模型对比) 一节末尾。最终选定 **uzh-rpg/RVT** + **1 Mpx 预训练 checkpoint**，理由：
-
-| 维度 | 与本项目契合点 |
-|---|---|
-| 传感器分辨率 | 1Mpx Automotive Dataset 采用 **Prophesee Gen4-class HD 传感器**，**与 IMX636 同代同分辨率**（1280×720） |
-| 检测类别 | pedestrian / two-wheeler / car，**直接覆盖项目的"人员≥50m / 车辆≥150m"无人侦察需求** |
-| 架构对应 | MaxViT 主干 + LSTM 时序 + YOLOX 头 ≈ **项目 YOLOv8n-EV 思路（事件张量化 → CNN → YOLO 头）**，可作基线对照 |
-| 公开度 | 提供 T/S/B 三档 .ckpt 直接下载，论文有完整 mAP / 参数 / 延迟报告 |
-
+<img width="502" height="220" alt="image" src="https://github.com/user-attachments/assets/2361291f-a5f4-421a-bb9f-7beda5ae5fb2" />
 
 ## 二、复现指标（实测）
 
