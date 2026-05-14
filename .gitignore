@@ -1,0 +1,27 @@
+# Large data and model files
+data/
+models/
+RVT/
+*.ckpt
+*.pth
+*.tar
+*.h5
+*.hdf5
+*.raw
+*.npy
+*.npz
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.env
+
+# Results (original full-size versions — only docs/ is tracked)
+results/videos/
+results/figures*/
+results/metrics/
+
+# OS
+.DS_Store
+Thumbs.db
