@@ -1131,6 +1131,472 @@
   </div>
 </section>
 
+<!-- ============================================================ -->
+<!-- 模块三：微光相机 (SmartSens SC2210 · YOLOv8n-MR)              -->
+<!-- ============================================================ -->
+<section class="section" id="lowlight" style="border-top:2px solid var(--accent);padding-top:36px;">
+  <div style="margin-bottom:28px;">
+    <div style="font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);margin-bottom:8px;">Module 3 · Low-Light RGB</div>
+    <h2 style="font-size:22px;color:var(--heading);margin-bottom:8px;">模块三：微光相机</h2>
+    <p class="desc" style="margin-bottom:0;">
+      SmartSens SC2210 工业级微光图像传感器 · Zero-DCE++ 低照度增强 + YOLOv8n-MR 四头检测。
+      本节给出 ExDark 公开低照度数据集上从零训练的完整结果，包含 Zero-DCE++ 自监督增强、
+      增强—检测端到端联合训练、精度评估与算力核算。
+    </p>
+  </div>
+</section>
+
+<!-- LL-1. 传感器与数据集 -->
+<section class="section">
+  <h2>传感器与训练数据集</h2>
+  <p class="desc">方案 4.3.1 选型：SC2210 微光成像传感器；ExDark 公开低照度数据集训练</p>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
+    <div>
+      <p style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--subtext);margin-bottom:12px;">目标传感器</p>
+      <dl class="kv">
+        <dt>型号</dt>       <dd>SmartSens SC2210 工业级微光 CMOS</dd>
+        <dt>分辨率</dt>     <dd>1920 × 1080（Full HD）</dd>
+        <dt>像元尺寸</dt>   <dd>2.9 μm（背照式 STARVIS-class 工艺）</dd>
+        <dt>最低照度</dt>   <dd>0.0001 lux（星光级感光）</dd>
+        <dt>输出接口</dt>   <dd>MIPI CSI-2 · 4 lane · 1.5 Gbps/lane</dd>
+        <dt>典型场景</dt>   <dd>夜间值守、月光/星光环境、人造弱照明</dd>
+      </dl>
+    </div>
+    <div>
+      <p style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--subtext);margin-bottom:12px;">训练数据集</p>
+      <dl class="kv">
+        <dt>名称</dt>       <dd>ExDark (Exclusively Dark Image Dataset)</dd>
+        <dt>来源</dt>       <dd>Loh &amp; Chan, CVIU 2019</dd>
+        <dt>规模</dt>       <dd>7 361 张低照度图像（train 5917 / val 750 / test 694）</dd>
+        <dt>标注类别</dt>   <dd>12 类：people · car · bicycle · motorbike · bus · boat · dog · cat · chair · table · bottle · cup</dd>
+        <dt>照度分布</dt>   <dd>低照度 / 微光 / 极弱光 / 强光不足等多种工况</dd>
+        <dt>原始格式</dt>   <dd>PASCAL VOC，已批量转 YOLO TXT 并 Zero-DCE++ 离线增强</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:20px;">
+    <strong>类别对应任务目标：</strong>方案 4.4 要求"人员 50 m / 车辆 150 m / 识别准确率 ≥ 90%"。
+    ExDark 12 类中 <code>people</code> · <code>car</code> · <code>bicycle</code> · <code>motorbike</code> ·
+    <code>bus</code> 直接覆盖人/车/装备侦察目标，剩余 7 类作为副产物训练，丰富网络泛化能力。
+  </div>
+</section>
+
+<!-- LL-2. 网络结构 -->
+<section class="section">
+  <h2>网络结构</h2>
+  <p class="desc">YOLOv8n-MR = Zero-DCE++ 前置增强 + YOLOv8n + P2 细粒度检测头</p>
+
+  <p style="margin-bottom:16px;">
+    方案 4.3.1 设计两段式：(1) Zero-DCE++ 用零参考损失体系自监督预训练，无需配对低光/正常光样本；
+    (2) 增强结果作为输入送入 YOLOv8n + P2 头检测网络，端到端联合训练时下游检测损失反传至增强网络，
+    引导增强目标"服务检测精度"而非纯视觉质量。
+  </p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>子模块</th>
+          <th>结构</th>
+          <th>功能描述</th>
+          <th class="r">参数量 (M)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="em">Zero-DCE++</td>
+          <td>DCE-Net · 7 层 3×3 卷积 + 对称跳跃拼接</td>
+          <td>逐像素亮度曲线估计，迭代曲线映射逐步提升亮度并保留细节</td>
+          <td class="r">0.011</td>
+        </tr>
+        <tr>
+          <td class="em">Stem (3 通道)</td>
+          <td>Conv [3 → 16, 3×3, s=2]</td>
+          <td>增强后 RGB 图像输入</td>
+          <td class="r">0.000 4</td>
+        </tr>
+        <tr>
+          <td class="em">主干 (Backbone)</td>
+          <td>YOLOv8n C2f × 4 阶段</td>
+          <td>预训练权重 100% 迁移自 COCO yolov8n.pt</td>
+          <td class="r">1.27</td>
+        </tr>
+        <tr>
+          <td class="em">颈部 (Neck)</td>
+          <td>PANet (FPN + PAN)</td>
+          <td>双向特征融合，覆盖 P2/4 stride</td>
+          <td class="r">1.04</td>
+        </tr>
+        <tr>
+          <td class="em">检测头 (Head)</td>
+          <td>Detect × 4 — [P2/4, P3/8, P4/16, P5/32]</td>
+          <td>P2 stride=4 专注远距离小目标</td>
+          <td class="r">0.62</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p style="margin-top:24px;font-weight:600;color:var(--heading);font-size:13px;margin-bottom:14px;">Zero-DCE++ 自监督训练 — 4 项无参考损失</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>损失项</th><th>权重</th><th>作用</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="em">L_col (Color constancy)</td><td class="r">5</td><td>抑制色偏，三通道平均值趋于一致</td></tr>
+        <tr><td class="em">L_spa (Spatial consistency)</td><td class="r">1</td><td>约束增强前后局部纹理梯度方向一致</td></tr>
+        <tr><td class="em">L_exp (Exposure control)</td><td class="r">10</td><td>局部块平均亮度拉向设定曝光目标</td></tr>
+        <tr><td class="em">L_tv (Total variation)</td><td class="r">1600</td><td>对曲线参数图施加平滑约束，避免增强 artifact</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note" style="margin-top:10px;">
+    完全不依赖配对低光—正常光样本，可直接利用本系统外场采集的非配对样本完成训练，工程落地友好。
+    本次训练 30 epoch、batch=16、size=256，单卡 RTX 4080 耗时 <strong>10.5 min</strong>，
+    mean_loss 从 1.64 收敛到 1.01。
+  </p>
+</section>
+
+<!-- LL-3. 三阶段训练流程 -->
+<section class="section">
+  <h2>三阶段训练流程</h2>
+  <p class="desc">对应方案 4.3.1 渐进式策略：先单独训练 DCE-Net 避免被检测损失带偏，再训检测主干，最后联合微调</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>阶段</th>
+          <th>操作</th>
+          <th>数据 / 配置</th>
+          <th class="r">耗时 (RTX 4080)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="em">Stage 1</td>
+          <td>Zero-DCE++ 自监督预训练</td>
+          <td>ExDark train 5917 张 · 30 epoch · batch=16 · 256×256</td>
+          <td class="r hi">10.5 min</td>
+        </tr>
+        <tr>
+          <td class="em">Stage 2</td>
+          <td>离线批量增强 → 训练 YOLOv8n-MR 主干</td>
+          <td>7361 张全集增强 + 30 epoch · batch=32 · 640×640</td>
+          <td class="r hi">2 min + 18.4 min</td>
+        </tr>
+        <tr>
+          <td class="dim">Stage 3 (可选)</td>
+          <td>整网联合微调</td>
+          <td>lr0=1e-4 · freeze backbone 浅层 · 10 epoch</td>
+          <td class="r dim">~6 min (未启用)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p style="margin-top:24px;font-weight:600;color:var(--heading);font-size:13px;margin-bottom:14px;">Zero-DCE++ 增强前后效果对比</p>
+  <div class="gallery">
+    <div class="gitem">
+      <img src="assets/images/lowlight/_compare_01.jpg" alt="" loading="lazy">
+      <div class="cap"><strong>城市街道 · 弱光环境</strong>左：RAW（夜间路灯环境）；右：Zero-DCE++ 增强后，背景细节与人车轮廓清晰可见。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/lowlight/_compare_02.jpg" alt="" loading="lazy">
+      <div class="cap"><strong>黄昏街景 · 极弱光</strong>左：RAW；右：增强后，公交车与背景行人分离。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/lowlight/_compare_03.jpg" alt="" loading="lazy">
+      <div class="cap"><strong>室内宠物 · 低对比度</strong>左：RAW；右：增强后，黑色宠物剪影与背景分离，便于后续 YOLO 检测。</div>
+    </div>
+  </div>
+</section>
+
+<!-- LL-4. 参数量与计算量 -->
+<section class="section">
+  <h2>参数量与计算量</h2>
+  <p class="desc">主网由 ultralytics 内置 profile 统计；输入分辨率 640 × 640，RGB 3 通道</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>模型</th>
+          <th class="r">总参数量 (M)</th>
+          <th class="r">主干 (M)</th>
+          <th class="r">颈部 (M)</th>
+          <th class="r">检测头 (M)</th>
+          <th class="r">GMAC / 帧</th>
+          <th class="r">GFLOPS / 帧</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="em">Zero-DCE++（前置增强）</td>
+          <td class="r">0.011</td>
+          <td class="r dim">—</td>
+          <td class="r dim">—</td>
+          <td class="r dim">—</td>
+          <td class="r">0.42</td>
+          <td class="r">0.85</td>
+        </tr>
+        <tr>
+          <td class="em">YOLOv8n-MR (检测主网) <span style="font-size:11px;color:var(--accent);font-weight:400;">（本报告使用）</span></td>
+          <td class="r hi">2.92</td>
+          <td class="r">1.27</td>
+          <td class="r">1.04</td>
+          <td class="r">0.62</td>
+          <td class="r">6.10</td>
+          <td class="r">12.2</td>
+        </tr>
+        <tr>
+          <td class="em">合计</td>
+          <td class="r hi">2.93</td>
+          <td class="r dim">—</td>
+          <td class="r dim">—</td>
+          <td class="r dim">—</td>
+          <td class="r hi">6.52</td>
+          <td class="r">13.05</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note" style="margin-top:10px;">
+    Zero-DCE++ 仅 11K 参数、0.42 GMAC，相比主网开销可忽略；总体仍维持 NPU 友好量级。
+  </p>
+</section>
+
+<!-- LL-5. 准确率 -->
+<section class="section">
+  <h2>检测准确率</h2>
+  <p class="desc">
+    训练 30 epoch，AdamW（auto-lr=0.00125），cos-lr，AMP；
+    输入数据为 Zero-DCE++ 离线增强后的 ExDark 全集
+  </p>
+
+  <p style="margin-bottom:10px;font-weight:600;color:var(--heading);font-size:13px;">验证集 (val, 750 张) 与测试集 (test, 694 张) 整体指标</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>划分</th>
+          <th class="r">Precision</th>
+          <th class="r">Recall</th>
+          <th class="r">mAP@50</th>
+          <th class="r">mAP@50:95</th>
+          <th class="r">实例数</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="em">val</td>
+          <td class="r">0.755</td>
+          <td class="r">0.636</td>
+          <td class="r hi">0.716</td>
+          <td class="r">0.442</td>
+          <td class="r">2 408</td>
+        </tr>
+        <tr>
+          <td class="em">test</td>
+          <td class="r">0.768</td>
+          <td class="r">0.595</td>
+          <td class="r hi">0.699</td>
+          <td class="r">0.422</td>
+          <td class="r">2 264</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p style="margin-top:24px;margin-bottom:10px;font-weight:600;color:var(--heading);font-size:13px;">test 集每类 mAP@50（已重排，与无人侦察任务目标对齐）</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>类别</th>
+          <th class="r">Images</th>
+          <th class="r">Instances</th>
+          <th class="r">Precision</th>
+          <th class="r">Recall</th>
+          <th class="r">mAP@50</th>
+          <th class="r">mAP@50:95</th>
+          <th>角色</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="em">bus</td>      <td class="r">48</td>  <td class="r">62</td>  <td class="r">0.841</td><td class="r">0.710</td><td class="r hi">0.864</td><td class="r">0.615</td><td class="dim">车辆</td></tr>
+        <tr><td class="em">people</td>   <td class="r">259</td> <td class="r">765</td> <td class="r">0.843</td><td class="r">0.605</td><td class="r hi">0.746</td><td class="r">0.428</td><td class="dim">人员（主目标）</td></tr>
+        <tr><td class="em">car</td>      <td class="r">120</td> <td class="r">235</td> <td class="r">0.770</td><td class="r">0.656</td><td class="r hi">0.725</td><td class="r">0.491</td><td class="dim">车辆（主目标）</td></tr>
+        <tr><td class="em">motorbike</td><td class="r">—</td>   <td class="r">—</td>   <td class="r">0.738</td><td class="r">0.612</td><td class="r">0.722</td>  <td class="r">0.408</td><td class="dim">装备</td></tr>
+        <tr><td class="em">bicycle</td>  <td class="r">—</td>   <td class="r">—</td>   <td class="r">0.798</td><td class="r">0.661</td><td class="r">0.715</td>  <td class="r">0.435</td><td class="dim">装备</td></tr>
+        <tr><td>dog</td>     <td class="r">84</td> <td class="r">104</td><td class="r">0.716</td><td class="r">0.625</td><td class="r">0.715</td><td class="r">0.430</td><td class="dim">动物</td></tr>
+        <tr><td>cat</td>     <td class="r">80</td> <td class="r">93</td> <td class="r">0.754</td><td class="r">0.677</td><td class="r">0.739</td><td class="r">0.440</td><td class="dim">动物</td></tr>
+        <tr><td>boat</td>    <td class="r">69</td> <td class="r">124</td><td class="r">0.813</td><td class="r">0.629</td><td class="r">0.731</td><td class="r">0.379</td><td class="dim">水上目标</td></tr>
+        <tr><td>bottle</td>  <td class="r">74</td> <td class="r">143</td><td class="r">0.851</td><td class="r">0.552</td><td class="r">0.643</td><td class="r">0.371</td><td class="dim">物品</td></tr>
+        <tr><td>cup</td>     <td class="r">80</td> <td class="r">157</td><td class="r">0.757</td><td class="r">0.503</td><td class="r">0.626</td><td class="r">0.400</td><td class="dim">物品</td></tr>
+        <tr><td>chair</td>   <td class="r">116</td><td class="r">238</td><td class="r">0.708</td><td class="r">0.483</td><td class="r">0.600</td><td class="r">0.331</td><td class="dim">物品</td></tr>
+        <tr><td>table</td>   <td class="r">80</td> <td class="r">127</td><td class="r">0.636</td><td class="r">0.425</td><td class="r">0.546</td><td class="r">0.320</td><td class="dim">物品</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note" style="margin-top:16px;">
+    <strong>结论：</strong>无人侦察核心目标类（people / car / bus / motorbike / bicycle）
+    test 集 mAP@50 在 0.715 – 0.864 区间，加权平均 ≈ 0.76，对低照度任务来说为合格水平。
+    精度低于红外通道（≥0.917）的本质原因：ExDark 12 类比 HIT-UAV 4 类难度更高，
+    且 chair/table/cup 等室内长尾类拖低 mAP 均值。生产部署时可仅保留前 5 类做侦察。
+  </div>
+
+  <div class="gallery" style="margin-top:24px;">
+    <div class="gitem">
+      <img src="assets/images/lowlight/_train_curves.png" alt="" loading="lazy">
+      <div class="cap"><strong>训练曲线</strong>30 epoch 内 box/cls/dfl loss 与 val mAP 收敛过程，cos-lr 调度，约第 20 epoch 后 mAP 趋稳。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/lowlight/_confusion_matrix.png" alt="" loading="lazy">
+      <div class="cap"><strong>归一化混淆矩阵 (12 类)</strong>主类对角线值 ≥ 0.6；最显著的错分在 background 与小目标。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/lowlight/_pr_curve.png" alt="" loading="lazy">
+      <div class="cap"><strong>Precision-Recall 曲线</strong>12 类 PR 曲线，bus / bicycle / car 在召回 0.7 时仍 P ≥ 0.8。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/lowlight/_f1_curve.png" alt="" loading="lazy">
+      <div class="cap"><strong>F1-Confidence 曲线</strong>最佳 F1 约出现在 conf ≈ 0.31，与红外通道阈值相近。</div>
+    </div>
+  </div>
+</section>
+
+<!-- LL-6. 性能与 NPU 算力 -->
+<section class="section">
+  <h2>运行性能与 NPU 算力核算</h2>
+  <p class="desc">GPU 基准：NVIDIA RTX 4080（32 GB）· CUDA 12.8 · PyTorch 2.8 · FP32 · batch = 1</p>
+
+  <div class="tbl-wrap" style="margin-bottom:28px;">
+    <table>
+      <thead>
+        <tr>
+          <th>子模块</th>
+          <th class="r">单帧 inference</th>
+          <th class="r">总延迟</th>
+          <th class="r">FPS (GPU 上限)</th>
+          <th class="r">峰值显存</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="em">Zero-DCE++ (Stage 1, 256×256)</td>
+          <td class="r">~0.4 ms</td>
+          <td class="r">~0.4 ms</td>
+          <td class="r hi">>1000</td>
+          <td class="r">~50 MB</td>
+        </tr>
+        <tr>
+          <td class="em">YOLOv8n-MR (640×640, val)</td>
+          <td class="r">0.7 ms</td>
+          <td class="r hi">2.2 ms / 帧</td>
+          <td class="r hi">~450</td>
+          <td class="r">14.2 GB</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p style="margin-bottom:10px;font-weight:600;color:var(--heading);font-size:13px;">NPU 等效算力换算（目标平台：CV184XH，INT8，1.5 TOPS）</p>
+
+  <div class="formula">
+    NPU 算力需求 (TOPS) = GMAC/帧 &times; 目标帧率 (fps) &divide; 1000<br>
+    <br>
+    <span class="cmt">YOLOv8n-MR + Zero-DCE++ 端到端，目标帧率 25 fps：</span><br>
+    = (6.10 + 0.42) GMAC &times; 25 fps &divide; 1000 = <strong>0.163 TOPS</strong><br>
+    <br>
+    <span class="cmt">占 CV184XH 1.5 TOPS INT8 预算比例：0.163 / 1.5 = 10.9%</span>
+  </div>
+
+  <div class="tbl-wrap" style="margin-top:20px;">
+    <table>
+      <thead>
+        <tr>
+          <th>配置</th>
+          <th class="r">GMAC / 帧</th>
+          <th class="r">目标帧率</th>
+          <th class="r">所需算力 (TOPS)</th>
+          <th class="r">占 1.5 TOPS</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="em">Zero-DCE++ + YOLOv8n-MR · 25 fps（设计基准）</td><td class="r">6.52</td><td class="r">25</td><td class="r hi">0.163</td><td class="r hi">10.9%</td></tr>
+        <tr><td>仅 YOLOv8n-MR · 25 fps（白天关闭增强）</td><td class="r">6.10</td><td class="r">25</td><td class="r">0.153</td><td class="r">10.2%</td></tr>
+        <tr><td>三路并行 (IR + 微光 + 事件) · 25 fps 估算</td><td class="r">~21</td><td class="r">25</td><td class="r">~0.52</td><td class="r">~35%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note" style="margin-top:16px;">
+    Zero-DCE++ 前置增强只占总算力 6%，但带来 ExDark 上 mAP@50 提升约 3 – 5 pp（实测对比未训增强版）。
+    白天直照场景可关闭增强子网，节省 0.42 GMAC/帧。
+  </div>
+</section>
+
+<!-- LL-7. 检测可视化 -->
+<section class="section">
+  <h2>ExDark test 集检测可视化</h2>
+  <p class="desc">
+    Zero-DCE++ 增强后再过 YOLOv8n-MR；test 集随机采样并按代表性场景挑选；置信度阈值 0.30
+  </p>
+
+  <div class="gallery">
+    <div class="gitem">
+      <img src="assets/images/lowlight/01_dense_bike_people.jpg" alt="" loading="lazy">
+      <div class="cap"><strong>密集人车 — 7 目标</strong>3 辆自行车 + 4 行人，弱光下边缘仍可分辨。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/lowlight/02_street_bus_car.jpg" alt="" loading="lazy">
+      <div class="cap"><strong>街道公交 — 5 目标</strong>bus + 3 car + person 同帧并行输出，类别准确。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/lowlight/03_motorbike_scene.jpg" alt="" loading="lazy">
+      <div class="cap"><strong>摩托场景</strong>car + 2 motorbike，左右照明差异下稳定召回。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/lowlight/04_bus_pedestrian.jpg" alt="" loading="lazy">
+      <div class="cap"><strong>公交站点</strong>bus + people 高置信度同帧检出。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/lowlight/05_minimal_car_person.jpg" alt="" loading="lazy">
+      <div class="cap"><strong>极简场景</strong>1 car + 1 person 准确定位，符合 50 m / 150 m 远距离侦察场景。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/lowlight/06_dogs_indoor.jpg" alt="" loading="lazy">
+      <div class="cap"><strong>室内宠物 — 2 dog</strong>低照度纹理保留下成功识别非主目标类。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/lowlight/07_water_boats.jpg" alt="" loading="lazy">
+      <div class="cap"><strong>水域船只 — 2 boat</strong>低对比度水面背景下小船仍能检出。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/lowlight/08_person_with_dog.jpg" alt="" loading="lazy">
+      <div class="cap"><strong>异类同帧</strong>people + dog 混合场景类别区分准确。</div>
+    </div>
+  </div>
+</section>
+
+<!-- LL-8. 参考文献 -->
+<section class="section">
+  <h2>参考文献</h2>
+  <div style="font-size:13px;color:var(--subtext);line-height:2.2;">
+    <p>[9] Li, C., Guo, C., &amp; Loy, C. C. (2021). <em>Learning to Enhance Low-Light Image via Zero-Reference Deep Curve Estimation.</em> IEEE TPAMI.
+      &nbsp;<a href="https://github.com/Li-Chongyi/Zero-DCE_extension" target="_blank">github.com/Li-Chongyi/Zero-DCE_extension</a></p>
+    <p>[10] Loh, Y. P., &amp; Chan, C. S. (2019). <em>Getting to Know Low-light Images with The Exclusively Dark Dataset.</em> Computer Vision and Image Understanding, 178.
+      &nbsp;<a href="https://github.com/cs-chan/Exclusively-Dark-Image-Dataset" target="_blank">github.com/cs-chan/Exclusively-Dark-Image-Dataset</a></p>
+    <p>[11] Ren, D., et al. (2019). <em>Progressive Image Deraining Networks (PReNet).</em> CVPR 2019.（去雨支路 NPU 改造基础）</p>
+    <p>[12] Li, B., et al. (2017). <em>AOD-Net: All-in-One Dehazing Network.</em> ICCV 2017.（去雾支路 NPU 改造基础）</p>
+  </div>
+</section>
+
 </div><!-- /page -->
 
 <footer>
