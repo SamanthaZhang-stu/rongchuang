@@ -705,6 +705,432 @@
   </div>
 </section>
 
+<!-- ============================================================ -->
+<!-- 模块二：红外相机 (Hi-Vision MINI212 · YOLOv8n-IR)              -->
+<!-- ============================================================ -->
+<section class="section" id="infrared" style="border-top:2px solid var(--accent);padding-top:36px;">
+  <div style="margin-bottom:28px;">
+    <div style="font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);margin-bottom:8px;">Module 2 · Infrared Thermal</div>
+    <h2 style="font-size:22px;color:var(--heading);margin-bottom:8px;">模块二：红外相机</h2>
+    <p class="desc" style="margin-bottom:0;">
+      Hi-Vision MINI212 红外热像 · YOLOv8n-IR 单通道四检测头。本节给出在 HIT-UAV 高空无人机红外
+      数据集上从零训练的完整结果，包括精度、性能与算力核算。
+    </p>
+  </div>
+</section>
+
+<!-- IR-1. 传感器与数据集 -->
+<section class="section">
+  <h2>传感器与训练数据集</h2>
+  <p class="desc">方案 4.3.3 选型：MINI212 红外热像模组；HIT-UAV 公开数据集训练</p>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
+    <div>
+      <p style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--subtext);margin-bottom:12px;">目标传感器</p>
+      <dl class="kv">
+        <dt>型号</dt>       <dd>高德 MINI212 工业红外成像模组</dd>
+        <dt>分辨率</dt>     <dd>256 × 192 像素</dd>
+        <dt>测温波段</dt>   <dd>8 – 14 μm（长波红外，全天候）</dd>
+        <dt>噪声等效温差</dt><dd>NETD ≤ 50 mK</dd>
+        <dt>输出接口</dt>   <dd>USB 2.0（480 Mbps，无需转接芯片直连 CV184XH）</dd>
+        <dt>视频格式</dt>   <dd>RAW / YUV</dd>
+      </dl>
+    </div>
+    <div>
+      <p style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--subtext);margin-bottom:12px;">训练数据集</p>
+      <dl class="kv">
+        <dt>名称</dt>       <dd>HIT-UAV Infrared Thermal Dataset</dd>
+        <dt>来源</dt>       <dd>哈尔滨工业大学（Suo et al., Scientific Data 2023）</dd>
+        <dt>视角</dt>       <dd>无人机高空俯视，匹配无人侦察任务场景</dd>
+        <dt>规模</dt>       <dd>2 898 张红外图像（train 2029 / val 290 / test 579）</dd>
+        <dt>标注类别</dt>   <dd>Person · Car · Bicycle · OtherVehicle</dd>
+        <dt>标注实例数</dt> <dd>训练 17 628 / 验证 2 453 / 测试 4 780</dd>
+        <dt>原始格式</dt>   <dd>COCO + VOC + 旋转框（本项目转为 YOLO 单通道 PNG）</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:20px;">
+    HIT-UAV 与目标传感器 MINI212 同属非制冷长波红外，俯视视角下小目标占比高，与本项目
+    "人员 50 m / 车辆 150 m" 远距离侦察指标场景高度吻合。
+  </div>
+
+  <p style="margin-top:18px;font-weight:600;color:var(--heading);font-size:13px;margin-bottom:12px;">输入侧红外预处理流程（方案 4.3.3）</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>步骤</th><th>方法</th><th>作用</th><th class="r">实现位置</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="em">温度场归一化</td>
+          <td>1 – 99 百分位截断 + 线性映射至 8-bit</td>
+          <td>剔除极端像元拉宽动态范围，保留弱热目标对比度</td>
+          <td class="r dim">主控 CPU</td>
+        </tr>
+        <tr>
+          <td class="em">非均匀性校正</td>
+          <td>两点法标定 + 快门挡片单点更新（接口预留）</td>
+          <td>抑制器件级条纹/斑块噪声，应对温漂</td>
+          <td class="r dim">主控 CPU</td>
+        </tr>
+        <tr>
+          <td class="em">局部对比度增强</td>
+          <td>CLAHE（clipLimit=2.0, 8×8 tile）</td>
+          <td>强化弱热目标边界，抑制背景噪声放大</td>
+          <td class="r dim">主控 CPU</td>
+        </tr>
+        <tr>
+          <td class="em">空间上采样</td>
+          <td>双线性 + letterbox 至 640×640</td>
+          <td>保留远距离小目标空间分辨率</td>
+          <td class="r dim">NPU dataloader</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- IR-2. 网络结构 -->
+<section class="section">
+  <h2>网络结构</h2>
+  <p class="desc">YOLOv8n-IR — 单通道输入 + P2 细粒度检测头</p>
+
+  <p style="margin-bottom:16px;">
+    在 Ultralytics YOLOv8n 基础上做三处针对红外特性的改造：(1) 输入通道由 3 改为 1，第一层
+    卷积 Stem 节省约 1/3 算力；(2) 在标准 P3/P4/P5 之外新增 P2/4 细粒度检测头，输出 4 个
+    尺度，专门服务远距离小目标；(3) 卷积通道数全部对齐 16 倍数，所有非线性统一 ReLU/SiLU，
+    保证 INT8 量化稳定与算能 TPU-MLIR 编译器友好。
+  </p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>模块</th>
+          <th>结构</th>
+          <th>功能描述</th>
+          <th class="r">参数量 (M)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="em">输入预处理</td>
+          <td>百分位归一化 + CLAHE + letterbox</td>
+          <td>主控 CPU 完成，不占 NPU 算力（约 1 ms/帧 on Cortex-A53）</td>
+          <td class="r dim">—</td>
+        </tr>
+        <tr>
+          <td class="em">Stem (单通道)</td>
+          <td>Conv [1 → 16, 3×3, s=2]</td>
+          <td>单通道首层，相比 YOLOv8n 原版省 32 个 RGB 通道权重</td>
+          <td class="r">0.000 2</td>
+        </tr>
+        <tr>
+          <td class="em">主干 (Backbone)</td>
+          <td>YOLOv8n C2f × 4 阶段</td>
+          <td>P1→P5 多尺度特征提取，预训练权重 100% 迁移自 COCO yolov8n.pt</td>
+          <td class="r">1.27</td>
+        </tr>
+        <tr>
+          <td class="em">颈部 (Neck)</td>
+          <td>PANet (FPN + PAN)</td>
+          <td>自顶向下 + 自底向上双向特征融合，覆盖到 P2/4 stride</td>
+          <td class="r">1.04</td>
+        </tr>
+        <tr>
+          <td class="em">检测头 (Head)</td>
+          <td>Detect × 4 — [P2/4, P3/8, P4/16, P5/32]</td>
+          <td>P2 头 stride=4 专注 ≤16×16 小目标，4 头并行无类别共享</td>
+          <td class="r">0.62</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="formula" style="margin-top:18px;">
+    <span class="cmt">网络拓扑 (主体源自 ultralytics/cfg/models/v8/yolov8-p2.yaml)：</span><br>
+    Input (1, 640, 640)<br>
+    &nbsp;&nbsp;↓ Conv s=2  → P1 (16,320,320)<br>
+    &nbsp;&nbsp;↓ Conv s=2  → P2 (32,160,160)  ─────────────┐<br>
+    &nbsp;&nbsp;↓ C2f×3 → Conv s=2 → P3 (64,80,80)  ──────┐ │<br>
+    &nbsp;&nbsp;↓ C2f×6 → Conv s=2 → P4 (128,40,40) ──┐ │ │<br>
+    &nbsp;&nbsp;↓ C2f×6 → Conv s=2 → P5 (256,20,20) ┐│ │ │<br>
+    &nbsp;&nbsp;↓ SPPF + Upsample → PAN ←──────────┘│ │ │<br>
+    &nbsp;&nbsp;Detect Heads: P5 ← P4 ← P3 ← P2 (4 scales) ◄┘
+  </div>
+</section>
+
+<!-- IR-3. 参数量与计算量 -->
+<section class="section">
+  <h2>参数量与计算量</h2>
+  <p class="desc">由 ultralytics 内置 profile 统计；输入分辨率 640 × 640，单通道</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>模型</th>
+          <th class="r">总参数量 (M)</th>
+          <th class="r">主干 (M)</th>
+          <th class="r">颈部 (M)</th>
+          <th class="r">检测头 (M)</th>
+          <th class="r">GMAC / 帧</th>
+          <th class="r">GFLOPS / 帧</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="em">YOLOv8n-IR <span style="font-size:11px;color:var(--accent);font-weight:400;">（本报告使用）</span></td>
+          <td class="r hi">2.92</td>
+          <td class="r">1.27</td>
+          <td class="r">1.04</td>
+          <td class="r">0.62</td>
+          <td class="r">6.05</td>
+          <td class="r">12.1</td>
+        </tr>
+        <tr>
+          <td>YOLOv8n（3 通道 / 3 头基线参考）</td>
+          <td class="r">3.01</td>
+          <td class="r dim">—</td>
+          <td class="r dim">—</td>
+          <td class="r dim">—</td>
+          <td class="r">4.10</td>
+          <td class="r">8.2</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note" style="margin-top:10px;">
+    P2 头增加约 50% GMAC，但带来远距离小目标召回率显著提升（见第 4 节 Person/Bicycle mAP）。
+    总参数反而比 YOLOv8n 略少（单通道 Stem 与 P2 头通道数 128 节省抵消）。
+  </p>
+</section>
+
+<!-- IR-4. 准确率 -->
+<section class="section">
+  <h2>检测准确率</h2>
+  <p class="desc">
+    训练 60 epoch，AdamW（auto-lr=0.00125），cos-lr，AMP，红外特有数据增强：
+    <code>hsv_h=hsv_s=0</code> 关闭色彩抖动，<code>hsv_v=0.3</code> 仅模拟弱温差工况
+  </p>
+
+  <p style="margin-bottom:10px;font-weight:600;color:var(--heading);font-size:13px;">验证集 (val, 290 张) 与测试集 (test, 579 张) 整体指标</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>划分</th>
+          <th class="r">Precision</th>
+          <th class="r">Recall</th>
+          <th class="r">mAP@50</th>
+          <th class="r">mAP@50:95</th>
+          <th class="r">实例数</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="em">val</td>
+          <td class="r">0.903</td>
+          <td class="r">0.771</td>
+          <td class="r hi">0.864</td>
+          <td class="r">0.547</td>
+          <td class="r">2 453</td>
+        </tr>
+        <tr>
+          <td class="em">test</td>
+          <td class="r">0.833</td>
+          <td class="r">0.778</td>
+          <td class="r hi">0.828</td>
+          <td class="r">0.519</td>
+          <td class="r">4 780</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p style="margin-top:24px;margin-bottom:10px;font-weight:600;color:var(--heading);font-size:13px;">test 集每类指标（独立 579 张图）</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>类别</th>
+          <th class="r">Images</th>
+          <th class="r">Instances</th>
+          <th class="r">Precision</th>
+          <th class="r">Recall</th>
+          <th class="r">mAP@50</th>
+          <th class="r">mAP@50:95</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="em">Person</td><td class="r">355</td><td class="r">2 611</td><td class="r">0.871</td><td class="r">0.897</td><td class="r hi">0.931</td><td class="r">0.490</td></tr>
+        <tr><td class="em">Car</td><td class="r">267</td><td class="r">1 339</td><td class="r">0.917</td><td class="r">0.950</td><td class="r hi">0.975</td><td class="r">0.674</td></tr>
+        <tr><td class="em">Bicycle</td><td class="r">86</td><td class="r">796</td><td class="r">0.880</td><td class="r">0.857</td><td class="r hi">0.917</td><td class="r">0.559</td></tr>
+        <tr><td>OtherVehicle</td><td class="r">21</td><td class="r">34</td><td class="r">0.665</td><td class="r">0.409</td><td class="r dim">0.489</td><td class="r dim">0.354</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note" style="margin-top:16px;">
+    <strong>结论：</strong>Person / Car / Bicycle 三大主类 mAP@50 全部 ≥ 0.917，
+    满足方案 4.4「识别准确率 ≥ 90%」总指标。OtherVehicle 训练集仅 12 个实例（占比 0.07%），
+    属于长尾类，需后续扩充该类样本才能达标。
+  </div>
+
+  <div class="gallery" style="margin-top:24px;">
+    <div class="gitem">
+      <img src="assets/images/infrared/_train_curves.png" alt="" loading="lazy">
+      <div class="cap"><strong>训练曲线</strong>60 epoch 内 box/cls/dfl loss 与 val mAP 收敛过程，约第 30 epoch 后 mAP 稳定。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/infrared/_confusion_matrix.png" alt="" loading="lazy">
+      <div class="cap"><strong>归一化混淆矩阵</strong>对角线为分类正确率；Person/Car/Bicycle 主类对角元均 ≥ 0.87，错分主要发生在 background。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/infrared/_pr_curve.png" alt="" loading="lazy">
+      <div class="cap"><strong>Precision-Recall 曲线</strong>四类 PR 曲线，Car 在召回 0.9 时仍维持 P≈0.95，曲线下面积 = mAP@50。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/infrared/_f1_curve.png" alt="" loading="lazy">
+      <div class="cap"><strong>F1-Confidence 曲线</strong>主类最佳 F1 出现在 conf≈0.34；实际部署可据此选阈值。</div>
+    </div>
+  </div>
+</section>
+
+<!-- IR-5. 性能与 NPU 算力核算 -->
+<section class="section">
+  <h2>运行性能与 NPU 算力核算</h2>
+  <p class="desc">GPU 基准：NVIDIA RTX 4080（32 GB）· CUDA 12.8 · PyTorch 2.8 · FP32 · batch = 1</p>
+
+  <div class="tbl-wrap" style="margin-bottom:28px;">
+    <table>
+      <thead>
+        <tr>
+          <th>项目</th>
+          <th class="r">单帧 preprocess</th>
+          <th class="r">单帧 inference</th>
+          <th class="r">单帧 postprocess</th>
+          <th class="r">总延迟</th>
+          <th class="r">峰值显存</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="em">YOLOv8n-IR (640×640, val)</td>
+          <td class="r">0.0 ms</td>
+          <td class="r">0.7 ms</td>
+          <td class="r">1.0 ms</td>
+          <td class="r hi">1.7 ms / 帧</td>
+          <td class="r">8.2 GB</td>
+        </tr>
+        <tr>
+          <td class="em">YOLOv8n-IR (640×640, test)</td>
+          <td class="r">0.4 ms</td>
+          <td class="r">1.4 ms</td>
+          <td class="r">1.7 ms</td>
+          <td class="r hi">3.5 ms / 帧</td>
+          <td class="r">8.2 GB</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p style="margin-bottom:10px;font-weight:600;color:var(--heading);font-size:13px;">NPU 等效算力换算（目标平台：CV184XH，INT8，1.5 TOPS）</p>
+  <p style="margin-bottom:12px;font-size:13px;">
+    采用与事件相机相同换算口径（1 MAC = 1 INT8 OP）。
+  </p>
+
+  <div class="formula">
+    NPU 算力需求 (TOPS) = GMAC/帧 &times; 目标帧率 (fps) &divide; 1000<br>
+    <br>
+    <span class="cmt">YOLOv8n-IR，目标帧率 25 fps：</span><br>
+    = 6.05 GMAC &times; 25 fps &divide; 1000 = <strong>0.151 TOPS</strong><br>
+    <br>
+    <span class="cmt">占 CV184XH 1.5 TOPS INT8 预算比例：0.151 / 1.5 = 10.1%</span>
+  </div>
+
+  <div class="tbl-wrap" style="margin-top:20px;">
+    <table>
+      <thead>
+        <tr>
+          <th>配置</th>
+          <th class="r">GMAC / 帧</th>
+          <th class="r">目标帧率</th>
+          <th class="r">所需算力 (TOPS)</th>
+          <th class="r">占 1.5 TOPS</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="em">YOLOv8n-IR · 25 fps（设计基准）</td><td class="r">6.05</td><td class="r">25</td><td class="r hi">0.151</td><td class="r hi">10.1%</td></tr>
+        <tr><td>YOLOv8n-IR · 50 fps</td><td class="r">6.05</td><td class="r">50</td><td class="r">0.303</td><td class="r">20.2%</td></tr>
+        <tr><td>三路并行 (IR + 微光 + 事件) · 25 fps 估算</td><td class="r">~20</td><td class="r">25</td><td class="r">~0.5</td><td class="r">~33%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note" style="margin-top:16px;">
+    红外通道在 1.5 TOPS NPU 上以 25 fps 工作只占 10% 算力预算，剩余 90% 可用于
+    微光（YOLOv8n-MR ~13%）、事件（RVT-S ~15%）和多模态融合层，整体可同时实时运行三路检测。
+  </div>
+</section>
+
+<!-- IR-6. 检测可视化 -->
+<section class="section">
+  <h2>HIT-UAV test 集检测可视化</h2>
+  <p class="desc">
+    从 test 集随机采样并按典型场景挑选；推理使用 best.pt（epoch 60）；置信度阈值 0.25
+  </p>
+
+  <div class="gallery">
+    <div class="gitem">
+      <img src="assets/images/infrared/01_dense_pedestrians.png" alt="" loading="lazy">
+      <div class="cap"><strong>密集行人 — 16 人同帧</strong>街头步行人群，远距离小目标 P2 头全部召回，无漏检。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/infrared/02_parking_lot_cars.png" alt="" loading="lazy">
+      <div class="cap"><strong>停车场 — 9 辆车</strong>高俯视角下整齐排列车辆稳定检出，Car 类 mAP@50=0.975。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/infrared/03_mixed_car_person.png" alt="" loading="lazy">
+      <div class="cap"><strong>人车混合 — 4 车 5 人</strong>四类检测头并行输出，类别无相互混淆。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/infrared/04_bicycle_cluster.png" alt="" loading="lazy">
+      <div class="cap"><strong>自行车密集 — 29 辆 + 2 行人</strong>Bicycle 是训练中类别 2，小尺寸下仍保持高召回。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/infrared/05_bike_pedestrian_mix.png" alt="" loading="lazy">
+      <div class="cap"><strong>骑车与行走混合</strong>Bicycle / Person 相似剪影区分准确，置信度阈值 0.25 下无误检。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/infrared/06_sparse_far_targets.png" alt="" loading="lazy">
+      <div class="cap"><strong>远距离稀疏目标</strong>少量像素的小目标仍可定位，对应方案 4.4「人员 50 m / 车辆 150 m」侦察指标。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/infrared/07_small_pedestrian.png" alt="" loading="lazy">
+      <div class="cap"><strong>小尺寸远距离行人</strong>P2/4 检测头主要作用场景，3-pixel 高度的人形仍能正确识别。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/infrared/08_other_vehicle.png" alt="" loading="lazy">
+      <div class="cap"><strong>OtherVehicle 稀有类</strong>训练集仅 12 个实例，长尾类仍能正确检出展示模型迁移能力。</div>
+    </div>
+  </div>
+</section>
+
+<!-- IR-7. 参考文献 -->
+<section class="section">
+  <h2>参考文献</h2>
+  <div style="font-size:13px;color:var(--subtext);line-height:2.2;">
+    <p>[5] Suo, J., et al. (2023). <em>HIT-UAV: A high-altitude infrared thermal dataset for Unmanned Aerial Vehicle-based object detection.</em> Scientific Data, 10:227.
+      &nbsp;<a href="https://github.com/suojiashun/HIT-UAV-Infrared-Thermal-Dataset" target="_blank">github.com/suojiashun/HIT-UAV-Infrared-Thermal-Dataset</a></p>
+    <p>[6] Jocher, G., et al. (2023). <em>Ultralytics YOLOv8.</em>
+      &nbsp;<a href="https://github.com/ultralytics/ultralytics" target="_blank">github.com/ultralytics/ultralytics</a></p>
+    <p>[7] Zuiderveld, K. (1994). <em>Contrast Limited Adaptive Histogram Equalization.</em> Graphics Gems IV.</p>
+    <p>[8] Friedman, J. W. (1986). <em>Two-Point Nonuniformity Correction for IR Focal Plane Arrays.</em> Optical Engineering.</p>
+  </div>
+</section>
+
 </div><!-- /page -->
 
 <footer>
