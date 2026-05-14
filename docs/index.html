@@ -3,1049 +3,715 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>事件相机目标检测实验报告 — RVT + IMX636</title>
+  <title>多传感器目标检测方案验证报告</title>
   <style>
     :root {
       --bg: #0f1117;
-      --surface: #1a1d2e;
-      --border: #2a2d3e;
+      --surface: #16192a;
+      --surface2: #1e2235;
+      --border: #272b3f;
       --accent: #4f9cf9;
-      --accent2: #7c5cbf;
+      --text: #cdd3f0;
+      --subtext: #7a82a8;
+      --heading: #f0f2ff;
       --green: #34c990;
-      --yellow: #f5c842;
-      --red: #e05252;
-      --text: #d4d8f0;
-      --subtext: #8890b0;
-      --heading: #ffffff;
+      --yellow: #e8b84b;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
       background: var(--bg);
       color: var(--text);
-      line-height: 1.7;
+      line-height: 1.75;
+      font-size: 14px;
     }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
+    code {
+      font-family: "SFMono-Regular", "Consolas", "Liberation Mono", monospace;
+      font-size: 13px;
+      color: #a8c8f0;
+      background: rgba(79,156,249,0.1);
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
 
-    /* Hero */
-    .hero {
-      background: linear-gradient(135deg, #0f1117 0%, #1a1d2e 50%, #0f1117 100%);
+    /* ---- top bar ---- */
+    .topbar {
       border-bottom: 1px solid var(--border);
-      padding: 56px 24px 48px;
-      text-align: center;
-    }
-    .hero .badge-row {
-      display: flex; flex-wrap: wrap; gap: 8px;
-      justify-content: center; margin-bottom: 24px;
-    }
-    .badge {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 4px 14px;
+      padding: 14px 32px;
       font-size: 12px;
       color: var(--subtext);
-    }
-    .badge.accent { border-color: var(--accent); color: var(--accent); }
-    .badge.green  { border-color: var(--green); color: var(--green); }
-    .hero h1 {
-      font-size: clamp(24px, 4vw, 42px);
-      font-weight: 700;
-      color: var(--heading);
-      margin-bottom: 12px;
-      letter-spacing: -0.5px;
-    }
-    .hero .sub {
-      font-size: 16px;
-      color: var(--subtext);
-      max-width: 680px;
-      margin: 0 auto 28px;
-    }
-    .hero-stats {
-      display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;
-    }
-    .hero-stat {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px 24px;
-      min-width: 140px;
-      text-align: center;
-    }
-    .hero-stat .val {
-      font-size: 28px; font-weight: 700; color: var(--accent);
-    }
-    .hero-stat .lbl { font-size: 12px; color: var(--subtext); margin-top: 4px; }
-
-    /* Layout */
-    .container { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
-    .section { padding: 52px 0 40px; border-bottom: 1px solid var(--border); }
-    .section:last-child { border-bottom: none; }
-    .section-title {
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--heading);
-      margin-bottom: 8px;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 20px;
     }
-    .section-title::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
-      margin-left: 12px;
-    }
-    .section-desc {
-      color: var(--subtext);
+    .topbar .logo {
+      font-weight: 700;
       font-size: 14px;
-      margin-bottom: 28px;
-    }
-
-    /* Cards */
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
-    }
-    .card-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 16px;
-    }
-    .card h3 {
-      font-size: 15px;
-      font-weight: 600;
       color: var(--heading);
+      letter-spacing: 0.02em;
+    }
+    .topbar .sep { opacity: 0.3; }
+
+    /* ---- hero ---- */
+    .hero {
+      padding: 52px 32px 44px;
+      border-bottom: 1px solid var(--border);
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .hero .label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
       margin-bottom: 14px;
     }
-
-    /* Architecture diagram */
-    .arch-flow {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 28px 24px;
-      overflow-x: auto;
-    }
-    .arch-block {
-      text-align: center;
-      padding: 14px 18px;
-      min-width: 120px;
-      flex-shrink: 0;
-    }
-    .arch-block .icon {
-      font-size: 28px;
-      display: block;
-      margin-bottom: 6px;
-    }
-    .arch-block .name {
-      font-size: 13px;
-      font-weight: 600;
+    .hero h1 {
+      font-size: clamp(22px, 3vw, 34px);
+      font-weight: 700;
       color: var(--heading);
+      line-height: 1.3;
+      margin-bottom: 12px;
     }
-    .arch-block .detail {
-      font-size: 11px;
+    .hero p {
+      font-size: 14px;
       color: var(--subtext);
-      margin-top: 3px;
-    }
-    .arch-block.highlight {
-      background: rgba(79,156,249,0.1);
-      border-radius: 8px;
-      border: 1px solid rgba(79,156,249,0.3);
-    }
-    .arch-arrow {
-      font-size: 22px;
-      color: var(--subtext);
-      padding: 0 4px;
-      flex-shrink: 0;
+      max-width: 660px;
+      line-height: 1.7;
     }
 
-    /* Tables */
-    .tbl-wrap { overflow-x: auto; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
+    /* ---- layout ---- */
+    .page { max-width: 900px; margin: 0 auto; padding: 0 32px; }
+
+    /* ---- module nav ---- */
+    .mod-nav {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 36px 0 0;
     }
-    th {
-      background: rgba(79,156,249,0.08);
+    .mod-tab {
+      flex: 1;
+      padding: 12px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--subtext);
+      border-right: 1px solid var(--border);
+      cursor: default;
+      background: var(--surface);
+    }
+    .mod-tab:last-child { border-right: none; }
+    .mod-tab.active {
+      background: rgba(79,156,249,0.1);
       color: var(--accent);
       font-weight: 600;
+    }
+    .mod-tab .sub { font-size: 11px; font-weight: 400; color: var(--subtext); margin-top: 2px; }
+
+    /* ---- section ---- */
+    .section {
+      padding: 44px 0 36px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section:last-child { border-bottom: none; }
+    .section > h2 {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--heading);
+      margin-bottom: 4px;
+    }
+    .section > .desc {
+      font-size: 13px;
+      color: var(--subtext);
+      margin-bottom: 24px;
+    }
+
+    /* ---- kv list ---- */
+    .kv { display: grid; grid-template-columns: 180px 1fr; row-gap: 10px; font-size: 13px; }
+    .kv dt { color: var(--subtext); }
+    .kv dd { color: var(--text); }
+
+    /* ---- tables ---- */
+    .tbl-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--subtext);
       text-align: left;
-      padding: 10px 14px;
+      padding: 8px 14px;
       border-bottom: 1px solid var(--border);
       white-space: nowrap;
     }
-    td {
+    tbody td {
       padding: 10px 14px;
-      border-bottom: 1px solid rgba(42,45,62,0.7);
+      border-bottom: 1px solid rgba(39,43,63,0.8);
       color: var(--text);
+      vertical-align: top;
     }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: rgba(255,255,255,0.02); }
-    .num { text-align: right; font-variant-numeric: tabular-nums; }
-    .good { color: var(--green); font-weight: 600; }
-    .warn { color: var(--yellow); font-weight: 600; }
-    .bad  { color: var(--red); }
-    .dim  { color: var(--subtext); }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: rgba(255,255,255,0.015); }
+    td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+    td.hi { color: var(--green); font-weight: 600; }
+    td.dim { color: var(--subtext); }
+    td.em { font-weight: 600; color: var(--heading); }
 
-    /* Formula box */
+    /* ---- formula block ---- */
     .formula {
-      background: #111520;
+      background: #0d1020;
       border: 1px solid var(--border);
       border-left: 3px solid var(--accent);
-      border-radius: 8px;
-      padding: 18px 20px;
+      border-radius: 6px;
+      padding: 16px 18px;
       margin: 16px 0;
-      font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
-      font-size: 14px;
-      color: #c8e6ff;
+      font-family: "SFMono-Regular", "Consolas", monospace;
+      font-size: 13px;
+      color: #b8d8f8;
+      line-height: 1.9;
       overflow-x: auto;
     }
-    .formula .comment {
-      color: var(--subtext);
-      font-style: italic;
-      font-family: -apple-system, "PingFang SC", sans-serif;
-    }
+    .formula .cmt { color: var(--subtext); font-style: italic; font-family: inherit; }
 
-    /* Image galleries */
+    /* ---- note box ---- */
+    .note {
+      border-left: 3px solid var(--border);
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--subtext);
+      margin: 16px 0;
+      line-height: 1.6;
+    }
+    .note.warn { border-left-color: var(--yellow); }
+    .note strong { color: var(--text); }
+
+    /* ---- image gallery ---- */
     .gallery {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
       gap: 12px;
     }
-    .gallery-item {
+    .gitem {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 8px;
       overflow: hidden;
-      transition: border-color 0.2s;
     }
-    .gallery-item:hover { border-color: var(--accent); }
-    .gallery-item img {
+    .gitem:hover { border-color: #3a4060; }
+    .gitem img {
       width: 100%;
       display: block;
       aspect-ratio: 16/9;
       object-fit: cover;
-      background: #111;
+      background: #080a12;
     }
-    .gallery-item .cap {
-      padding: 10px 12px;
+    .gitem .cap {
+      padding: 9px 11px;
       font-size: 12px;
       color: var(--subtext);
-      line-height: 1.4;
+      line-height: 1.5;
     }
-    .gallery-item .cap strong { color: var(--text); display: block; margin-bottom: 2px; }
+    .gitem .cap strong { color: var(--text); display: block; margin-bottom: 2px; font-size: 12px; }
 
-    /* Video gallery */
-    .video-grid {
+    /* ---- video grid ---- */
+    .vgrid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 16px;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
     }
-    .video-card {
+    .vcard {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      overflow: hidden;
-    }
-    .video-card video {
-      width: 100%;
-      display: block;
-      background: #000;
-    }
-    .video-card .vcap {
-      padding: 12px 14px;
-    }
-    .video-card .vcap strong {
-      font-size: 13px;
-      color: var(--heading);
-      display: block;
-      margin-bottom: 4px;
-    }
-    .video-card .vcap span {
-      font-size: 12px;
-      color: var(--subtext);
-    }
-
-    /* NPU bar */
-    .bar-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin: 8px 0;
-    }
-    .bar-label { width: 180px; font-size: 13px; color: var(--text); flex-shrink: 0; }
-    .bar-track {
-      flex: 1;
-      height: 20px;
-      background: rgba(255,255,255,0.05);
-      border-radius: 4px;
-      overflow: hidden;
-    }
-    .bar-fill {
-      height: 100%;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      padding-left: 8px;
-      font-size: 11px;
-      font-weight: 600;
-      color: #fff;
-      transition: width 1s ease;
-    }
-    .bar-pct { font-size: 12px; color: var(--subtext); width: 60px; text-align: right; }
-
-    /* Callout */
-    .callout {
-      background: rgba(79,156,249,0.07);
-      border: 1px solid rgba(79,156,249,0.25);
       border-radius: 8px;
-      padding: 16px 18px;
-      font-size: 14px;
-      margin: 16px 0;
+      overflow: hidden;
     }
-    .callout.warn {
-      background: rgba(245,200,66,0.07);
-      border-color: rgba(245,200,66,0.25);
-    }
-    .callout.good {
-      background: rgba(52,201,144,0.07);
-      border-color: rgba(52,201,144,0.25);
-    }
+    .vcard video { width: 100%; display: block; background: #000; }
+    .vcard .vcap { padding: 10px 12px; }
+    .vcard .vcap strong { font-size: 13px; color: var(--heading); display: block; margin-bottom: 3px; }
+    .vcard .vcap span { font-size: 12px; color: var(--subtext); }
 
-    /* Inline tag */
-    .tag {
-      display: inline-block;
-      background: rgba(79,156,249,0.15);
-      color: var(--accent);
-      border-radius: 4px;
-      padding: 1px 7px;
-      font-size: 12px;
-      font-weight: 500;
-    }
-
-    /* Footer */
+    /* ---- footer ---- */
     footer {
-      padding: 32px 24px;
-      text-align: center;
+      border-top: 1px solid var(--border);
+      padding: 24px 32px;
       font-size: 12px;
       color: var(--subtext);
-      border-top: 1px solid var(--border);
+      max-width: 900px;
+      margin: 0 auto;
     }
 
-    @media (max-width: 600px) {
-      .hero { padding: 40px 16px 36px; }
-      .arch-flow { padding: 20px 12px; }
-      .arch-block { min-width: 90px; padding: 10px 10px; }
-      .gallery { grid-template-columns: 1fr; }
+    @media (max-width: 640px) {
+      .topbar, .hero, .page, footer { padding-left: 16px; padding-right: 16px; }
+      .mod-tab .sub { display: none; }
+      .kv { grid-template-columns: 140px 1fr; }
     }
   </style>
 </head>
 <body>
 
-<!-- ===== HERO ===== -->
+<div class="topbar">
+  <span class="logo">多传感器目标检测方案验证报告</span>
+  <span class="sep">|</span>
+  <span>一体化芯粒集成器件硬件验证平台</span>
+</div>
+
 <div class="hero">
-  <div class="badge-row">
-    <span class="badge accent">CVPR 2023</span>
-    <span class="badge">RVT — Recurrent Vision Transformer</span>
-    <span class="badge green">预训练模型推理</span>
-    <span class="badge">IMX636 / Gen4 传感器</span>
-    <span class="badge">三类目标检测</span>
-  </div>
-  <h1>事件相机目标检测实验报告</h1>
-  <p class="sub">基于 RVT 预训练模型在 IMX636 事件相机数据上的推理验证，覆盖准确率、算力分析与静态摄像头场景适应性评估</p>
-  <div class="hero-stats">
-    <div class="hero-stat">
-      <div class="val">9.87M</div>
-      <div class="lbl">RVT-S 参数量</div>
+  <div class="label">Sensor Perception Benchmark</div>
+  <h1>多传感器目标检测方案验证报告</h1>
+  <p>针对一体化芯粒集成器件平台（CV184XH，INT8 NPU 算力 1.5 TOPS），分传感器模态对目标检测算法进行选型、性能评测与算力核算。本页为事件相机模块。</p>
+
+  <div class="mod-nav">
+    <div class="mod-tab active">
+      模块一：事件相机
+      <div class="sub">Sony/Prophesee IMX636 · RVT</div>
     </div>
-    <div class="hero-stat">
-      <div class="val">44.1%</div>
-      <div class="lbl">mAP (1Mpx 官方测试集)</div>
+    <div class="mod-tab">
+      模块二：红外相机
+      <div class="sub">待更新</div>
     </div>
-    <div class="hero-stat">
-      <div class="val">127 fps</div>
-      <div class="lbl">GPU 推理速度 (RTX 4060)</div>
-    </div>
-    <div class="hero-stat">
-      <div class="val">0.219 TOPS</div>
-      <div class="lbl">NPU 等效算力 @25fps</div>
-    </div>
-    <div class="hero-stat">
-      <div class="val">14.6%</div>
-      <div class="lbl">占 CV184XH 1.5T 预算</div>
+    <div class="mod-tab">
+      模块三：微光相机
+      <div class="sub">待更新</div>
     </div>
   </div>
 </div>
 
-<!-- ===== CONTAINER ===== -->
-<div class="container">
+<div class="page">
 
-<!-- ===== 1. 传感器与任务 ===== -->
+<!-- 1. 传感器与数据集 -->
 <section class="section">
-  <h2 class="section-title">硬件背景与任务定义</h2>
-  <p class="section-desc">项目目标平台与选型依据</p>
-  <div class="card-grid">
-    <div class="card">
-      <h3>目标传感器</h3>
-      <p style="font-size:14px;">Sony / Prophesee <strong style="color:var(--accent)">IMX636</strong>（Gen4 HD）</p>
-      <ul style="font-size:13px;color:var(--subtext);margin-top:10px;padding-left:16px;line-height:2;">
-        <li>分辨率：1280 × 720 像素</li>
-        <li>像元尺寸：4.86 µm（背照式堆叠 CMOS）</li>
-        <li>输出接口：MIPI CSI-2 × 4 lane @ 1.5 Gbps/lane</li>
-        <li>事件格式：EVT3（差分亮度事件流）</li>
-      </ul>
-      <div class="callout good" style="margin-top:14px;">
-        1Mpx Automotive Dataset 所用传感器即 IMX636 的前代原型（同年 ISSCC 2020 Paper 5.10，同款像元），传感器参数完全吻合。
-      </div>
+  <h2>传感器与预训练数据集</h2>
+  <p class="desc">算法选型依据与数据集基本参数</p>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
+    <div>
+      <p style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--subtext);margin-bottom:12px;">目标传感器</p>
+      <dl class="kv">
+        <dt>型号</dt>       <dd>Sony / Prophesee IMX636（Gen4 HD）</dd>
+        <dt>分辨率</dt>     <dd>1280 × 720 像素</dd>
+        <dt>像元尺寸</dt>   <dd>4.86 µm，背照式堆叠 CMOS</dd>
+        <dt>输出接口</dt>   <dd>MIPI CSI-2 × 4 lane @ 1.5 Gbps/lane</dd>
+        <dt>事件编码</dt>   <dd>EVT3（差分亮度阈值触发）</dd>
+      </dl>
     </div>
-    <div class="card">
-      <h3>检测目标与验收指标</h3>
-      <table>
-        <tr><th>指标</th><th>项目要求</th><th>RVT-S 实测</th></tr>
-        <tr><td>检测距离（行人）</td><td>≥ 50 m</td><td class="dim">数据集内可见</td></tr>
-        <tr><td>检测距离（车辆）</td><td>≥ 150 m</td><td class="dim">数据集内可见</td></tr>
-        <tr><td>识别准确率 mAP-50</td><td>≥ 90%</td><td class="warn">79.7%（训练集） / 71.7%（论文测试集）</td></tr>
-        <tr><td>实时处理帧率</td><td>≥ 25 fps</td><td class="good">≥ 100 fps ✓</td></tr>
-        <tr><td>NPU INT8 算力</td><td>≤ 1.5 TOPS</td><td class="good">0.219 TOPS ✓</td></tr>
-      </table>
+    <div>
+      <p style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--subtext);margin-bottom:12px;">预训练数据集</p>
+      <dl class="kv">
+        <dt>名称</dt>       <dd>1 Megapixel Automotive Detection Dataset</dd>
+        <dt>发布机构</dt>   <dd>Prophesee</dd>
+        <dt>传感器</dt>     <dd>Gen4 HD（与 IMX636 同代，规格一致）</dd>
+        <dt>场景</dt>       <dd>城市道路行车，法国巴黎</dd>
+        <dt>时长</dt>       <dd>训练 24 h / 验证 4 h / 测试 4 h</dd>
+        <dt>标注类别</dt>   <dd>pedestrian · two-wheeler · car</dd>
+        <dt>标注密度</dt>   <dd>每 50 ms 一帧，约 2500 万个 bounding box</dd>
+      </dl>
     </div>
+  </div>
+
+  <div class="note" style="margin-top:20px;">
+    1 Mpx Automotive Dataset 所用传感器为 IMX636 的同代原型机（ISSCC 2020 Paper 5.10，像元规格相同），
+    是目前公开数据集中与 IMX636 传感器特性吻合度最高的基准数据。
   </div>
 </section>
 
-<!-- ===== 2. 网络结构 ===== -->
+<!-- 2. 网络结构 -->
 <section class="section">
-  <h2 class="section-title">网络结构详解</h2>
-  <p class="section-desc">RVT（Recurrent Vision Transformer）— Gehrig &amp; Scaramuzza, CVPR 2023 &nbsp;<a href="https://github.com/uzh-rpg/RVT" target="_blank">GitHub</a></p>
+  <h2>网络结构</h2>
+  <p class="desc">RVT（Recurrent Vision Transformer）— Gehrig &amp; Scaramuzza, CVPR 2023
+    &nbsp;<a href="https://github.com/uzh-rpg/RVT" target="_blank">github.com/uzh-rpg/RVT</a></p>
 
-  <div class="arch-flow" style="margin-bottom:24px;">
-    <div class="arch-block">
-      <span class="icon">🎥</span>
-      <div class="name">事件流输入</div>
-      <div class="detail">1280×720 EVT3</div>
-    </div>
-    <div class="arch-arrow">→</div>
-    <div class="arch-block">
-      <span class="icon">📊</span>
-      <div class="name">堆叠直方图</div>
-      <div class="detail">2极性 × 10时间bin<br>dt=50ms 窗口</div>
-    </div>
-    <div class="arch-arrow">→</div>
-    <div class="arch-block">
-      <span class="icon">⬇️</span>
-      <div class="name">2× 降采样</div>
-      <div class="detail">→ 640×360<br>→ 补零 → 640×384</div>
-    </div>
-    <div class="arch-arrow">→</div>
-    <div class="arch-block highlight">
-      <span class="icon">🔷</span>
-      <div class="name">MaxViT 主干</div>
-      <div class="detail">局部注意力 + 全局注意力<br>4 阶段，7.21M 参数</div>
-    </div>
-    <div class="arch-arrow">→</div>
-    <div class="arch-block highlight">
-      <span class="icon">🔄</span>
-      <div class="name">ConvLSTM 时序</div>
-      <div class="detail">每阶段末嵌入<br>跨帧状态传递</div>
-    </div>
-    <div class="arch-arrow">→</div>
-    <div class="arch-block">
-      <span class="icon">🔺</span>
-      <div class="name">PAFPN 颈部</div>
-      <div class="detail">多尺度特征融合<br>1.60M 参数</div>
-    </div>
-    <div class="arch-arrow">→</div>
-    <div class="arch-block">
-      <span class="icon">🎯</span>
-      <div class="name">YOLOX 检测头</div>
-      <div class="detail">行人 / 两轮车 / 汽车<br>1.07M 参数</div>
-    </div>
-  </div>
-
-  <div class="card-grid">
-    <div class="card">
-      <h3>输入表示</h3>
-      <p style="font-size:13px;color:var(--subtext);line-height:1.8;">
-        原始事件流按时间窗口（dt = 50 ms）分成 10 个时间 bin，分别统计 ON 极性和 OFF 极性落入每个 bin 的事件数，得到形状为
-        <span class="tag">(20, 384, 640)</span> 的浮点张量。
-        20 通道 = 2 极性 × 10 时间 bin。
-        传感器原始 720 行降采样后为 360 行，补零到 384（须为 64 的倍数）。
-      </p>
-    </div>
-    <div class="card">
-      <h3>时序建模</h3>
-      <p style="font-size:13px;color:var(--subtext);line-height:1.8;">
-        MaxViT 每个阶段末接一个 ConvLSTM 层。推理时逐帧输入，<code style="color:var(--accent)">states</code> 在帧间显式传递，使网络能记住过去帧的运动历史（等效"事件帧级光流"），这是 RNN 事件相机检测的核心优势。
-      </p>
-    </div>
-  </div>
-</section>
-
-<!-- ===== 3. 参数量 ===== -->
-<section class="section">
-  <h2 class="section-title">模型参数量</h2>
-  <p class="section-desc">使用 <code style="color:var(--accent)">fvcore.nn.FlopCountAnalysis</code> + PyTorch <code style="color:var(--accent)">numel()</code> 精确测量</p>
-  <div class="tbl-wrap">
-    <table>
-      <tr>
-        <th>模型</th>
-        <th>主干 MaxViT (M)</th>
-        <th>颈部 PAFPN (M)</th>
-        <th>检测头 YOLOX (M)</th>
-        <th class="num">总参数量 (M)</th>
-        <th class="num">GMAC/帧</th>
-        <th class="num">GFLOPS/帧</th>
-      </tr>
-      <tr>
-        <td><strong>RVT-S</strong> <span class="tag">本报告使用</span></td>
-        <td>7.209</td>
-        <td>1.596</td>
-        <td>1.065</td>
-        <td class="num"><strong>9.87</strong></td>
-        <td class="num">8.740</td>
-        <td class="num">17.48</td>
-      </tr>
-      <tr>
-        <td>RVT-T（轻量版）</td>
-        <td>—</td>
-        <td>—</td>
-        <td>—</td>
-        <td class="num">4.41</td>
-        <td class="num">4.128</td>
-        <td class="num">8.26</td>
-      </tr>
-      <tr>
-        <td>RVT-B（大版）</td>
-        <td>—</td>
-        <td>—</td>
-        <td>—</td>
-        <td class="num dim">~22（估算）</td>
-        <td class="num dim">~19（估算）</td>
-        <td class="num dim">~38（估算）</td>
-      </tr>
-    </table>
-  </div>
-  <p style="font-size:12px;color:var(--subtext);margin-top:8px;">GFLOPS = 2 × GMAC（每个 MAC 含 1 次乘法 + 1 次加法）。</p>
-</section>
-
-<!-- ===== 4. 训练数据集 ===== -->
-<section class="section">
-  <h2 class="section-title">预训练数据集</h2>
-  <p class="section-desc">Prophesee 1 Mpx Automotive Detection Dataset</p>
-  <div class="card-grid">
-    <div class="card">
-      <h3>数据集基本信息</h3>
-      <table>
-        <tr><td>全称</td><td><strong>1 Megapixel Automotive Detection Dataset</strong></td></tr>
-        <tr><td>发布机构</td><td>Prophesee（事件相机厂商）</td></tr>
-        <tr><td>传感器</td><td>Gen4 HD（与 IMX636 同代，1280×720，4.86 µm 像元）</td></tr>
-        <tr><td>场景</td><td>城市道路行车（法国巴黎及周边）</td></tr>
-        <tr><td>训练 / 验证 / 测试</td><td>24h / 4h / 4h</td></tr>
-        <tr><td>标注类别</td><td>行人（pedestrian）、两轮车（two-wheeler）、汽车（car）</td></tr>
-        <tr><td>标注格式</td><td>每 50 ms 一帧边界框标注，约 2500 万个 bounding box</td></tr>
-      </table>
-    </div>
-    <div class="card">
-      <h3>为何选择此数据集</h3>
-      <ul style="font-size:13px;color:var(--subtext);padding-left:16px;line-height:2.2;">
-        <li>传感器分辨率与 IMX636 完全一致（1280×720）</li>
-        <li>同款像元规格（4.86 µm，背照式堆叠 CMOS），事件特性高度相似</li>
-        <li>检测目标（行人 + 车辆）与项目无人侦察任务对齐</li>
-        <li>RVT 论文有官方测试集 mAP 数值，可作为基线对比</li>
-        <li>有公开预训练权重可直接复现</li>
-      </ul>
-    </div>
-  </div>
-</section>
-
-<!-- ===== 5. 准确率 ===== -->
-<section class="section">
-  <h2 class="section-title">准确率指标</h2>
-  <p class="section-desc">mAP 按 COCO 协议计算；AP<sub>50:95</sub> 即 IoU 阈值从 0.50 到 0.95 以 0.05 步长平均</p>
-
-  <div class="callout warn" style="margin-bottom:20px;">
-    <strong>⚠ 数据说明：</strong> 本地推理使用的 Moorea 序列来自 <em>训练集</em>，模型见过该数据，mAP 偏高（过拟合上界）。
-    项目应以论文官方测试集 mAP 为准。
-  </div>
+  <p style="margin-bottom:16px;">
+    RVT 由三个串联模块组成：MaxViT 主干网络、PAFPN 颈部与 YOLOX 检测头，并在主干每阶段末嵌入 ConvLSTM 单元以建模时序依赖。
+  </p>
 
   <div class="tbl-wrap">
     <table>
-      <tr>
-        <th>数据来源</th>
-        <th>模型</th>
-        <th class="num">mAP@50:95</th>
-        <th class="num">mAP@50</th>
-        <th class="num">mAP@75</th>
-        <th class="num">AP<sub>small</sub></th>
-        <th class="num">AP<sub>medium</sub></th>
-        <th class="num">AP<sub>large</sub></th>
-      </tr>
-      <tr>
-        <td>论文官方 1Mpx 测试集 ✅</td>
-        <td><strong>RVT-S</strong></td>
-        <td class="num"><strong class="good">44.1%</strong></td>
-        <td class="num">71.7%</td>
-        <td class="num">—</td>
-        <td class="num">—</td>
-        <td class="num">—</td>
-        <td class="num">—</td>
-      </tr>
-      <tr>
-        <td>论文官方 1Mpx 测试集 ✅</td>
-        <td>RVT-T</td>
-        <td class="num">41.5%</td>
-        <td class="num">—</td>
-        <td class="num">—</td>
-        <td class="num">—</td>
-        <td class="num">—</td>
-        <td class="num">—</td>
-      </tr>
-      <tr>
-        <td>论文官方 1Mpx 测试集 ✅</td>
-        <td>RVT-B</td>
-        <td class="num">47.4%</td>
-        <td class="num">—</td>
-        <td class="num">—</td>
-        <td class="num">—</td>
-        <td class="num">—</td>
-        <td class="num">—</td>
-      </tr>
-      <tr style="opacity:.7">
-        <td>本地 Moorea 训练集片段 ⚠</td>
-        <td>RVT-S</td>
-        <td class="num">55.1%</td>
-        <td class="num">79.7%</td>
-        <td class="num">62.7%</td>
-        <td class="num">38.6%</td>
-        <td class="num">58.8%</td>
-        <td class="num">63.4%</td>
-      </tr>
-      <tr style="opacity:.7">
-        <td>本地 Moorea 训练集片段 ⚠</td>
-        <td>RVT-T</td>
-        <td class="num">46.2%</td>
-        <td class="num">71.0%</td>
-        <td class="num">50.4%</td>
-        <td class="num">30.5%</td>
-        <td class="num">46.4%</td>
-        <td class="num">60.7%</td>
-      </tr>
+      <thead>
+        <tr>
+          <th>模块</th>
+          <th>结构</th>
+          <th>功能描述</th>
+          <th class="r">参数量 (M)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="em">输入表示</td>
+          <td>堆叠直方图<br><code>stacked_histogram</code></td>
+          <td>原始事件流按 50 ms 窗口分为 10 个时间 bin，分极性（ON/OFF）计数，得到张量
+              <code>(20, 384, 640)</code>；传感器输出 720 行，降采样 2× 至 360 行后补零至 384（须为 64 的倍数）</td>
+          <td class="r dim">—</td>
+        </tr>
+        <tr>
+          <td class="em">主干</td>
+          <td>MaxViT + ConvLSTM</td>
+          <td>4 阶段的多轴视觉 Transformer，局部窗口注意力与全局稀疏注意力交替堆叠；
+              每阶段末嵌入 ConvLSTM，将隐状态跨帧传递以捕获运动历史</td>
+          <td class="r">7.209</td>
+        </tr>
+        <tr>
+          <td class="em">颈部</td>
+          <td>PAFPN</td>
+          <td>路径聚合特征金字塔网络，融合多尺度特征图，改善小目标检测能力</td>
+          <td class="r">1.596</td>
+        </tr>
+        <tr>
+          <td class="em">检测头</td>
+          <td>YOLOX（解耦头）</td>
+          <td>分类与回归分支解耦；输出三类目标（行人、两轮车、汽车）的边界框与置信度</td>
+          <td class="r">1.065</td>
+        </tr>
+      </tbody>
     </table>
-  </div>
-
-  <div class="callout" style="margin-top:16px;">
-    项目设计目标为 mAP-50 ≥ 90%。RVT-S 在官方测试集上达到 <strong>71.7% mAP-50</strong>，
-    差距主要来自：训练数据为前视行车视角，而项目需要静止摄像头鸟瞰视角，存在域偏移。
-    后续可通过在项目实际场景数据上微调来弥补。
   </div>
 </section>
 
-<!-- ===== 6. GPU 运行性能 ===== -->
+<!-- 3. 参数量与计算量 -->
 <section class="section">
-  <h2 class="section-title">GPU 运行性能</h2>
-  <p class="section-desc">测试硬件：NVIDIA RTX 4060 Laptop GPU（8 GB VRAM）· CUDA 12.6 · PyTorch FP32 · batch=1</p>
+  <h2>参数量与计算量</h2>
+  <p class="desc">使用 <code>fvcore.nn.FlopCountAnalysis</code> 对完整前向过程精确计数；输入分辨率 640 × 384</p>
 
-  <div class="tbl-wrap" style="margin-bottom:24px;">
+  <div class="tbl-wrap">
     <table>
-      <tr>
-        <th>模型</th>
-        <th class="num">GMAC / 帧</th>
-        <th class="num">GFLOPS / 帧</th>
-        <th class="num">FP32 延迟 (ms)</th>
-        <th class="num">FP32 理论 fps</th>
-        <th class="num">实测流推理 fps</th>
-        <th class="num">峰值显存 (MB)</th>
-      </tr>
-      <tr>
-        <td><strong>RVT-S</strong></td>
-        <td class="num">8.740</td>
-        <td class="num">17.48</td>
-        <td class="num">7.83</td>
-        <td class="num good">127.7</td>
-        <td class="num good">112.7</td>
-        <td class="num">224</td>
-      </tr>
-      <tr>
-        <td>RVT-T</td>
-        <td class="num">4.128</td>
-        <td class="num">8.26</td>
-        <td class="num">7.24</td>
-        <td class="num good">138.1</td>
-        <td class="num good">114.1</td>
-        <td class="num">193</td>
-      </tr>
+      <thead>
+        <tr>
+          <th>模型</th>
+          <th class="r">总参数量 (M)</th>
+          <th class="r">主干 (M)</th>
+          <th class="r">颈部 (M)</th>
+          <th class="r">检测头 (M)</th>
+          <th class="r">GMAC / 帧</th>
+          <th class="r">GFLOPS / 帧</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="em">RVT-S <span style="font-size:11px;color:var(--accent);font-weight:400;">（本报告使用）</span></td>
+          <td class="r hi">9.87</td>
+          <td class="r">7.209</td>
+          <td class="r">1.596</td>
+          <td class="r">1.065</td>
+          <td class="r">8.740</td>
+          <td class="r">17.48</td>
+        </tr>
+        <tr>
+          <td>RVT-T（轻量版）</td>
+          <td class="r">4.41</td>
+          <td class="r dim">—</td>
+          <td class="r dim">—</td>
+          <td class="r dim">—</td>
+          <td class="r">4.128</td>
+          <td class="r">8.26</td>
+        </tr>
+        <tr>
+          <td>RVT-B（标准版）</td>
+          <td class="r">47.84</td>
+          <td class="r dim">—</td>
+          <td class="r dim">—</td>
+          <td class="r dim">—</td>
+          <td class="r dim">—</td>
+          <td class="r dim">—</td>
+        </tr>
+      </tbody>
     </table>
   </div>
-
-  <div class="card-grid">
-    <div class="card">
-      <h3>FLOPS 与分辨率的关系</h3>
-      <p style="font-size:13px;color:var(--subtext);margin-bottom:14px;">
-        由于 MaxViT 使用局部 + 全局注意力，FLOPS 与输入像素数近似线性关系（≈ 35 GMAC/百万像素）：
-      </p>
-      <div class="formula">
-        GMAC ∝ H × W<br>
-        <span class="comment">// 640×384 → 8.74 GMAC ≈ 35 GMAC/MP × 0.246MP</span><br>
-        <span class="comment">// 降至 320×192 可节省约 75% 算力</span>
-      </div>
-    </div>
-    <div class="card">
-      <h3>IMX636 输入处理流程</h3>
-      <div class="formula" style="font-size:12px;line-height:1.9;">
-        原始分辨率：1280 × 720<br>
-        降采样 ×2：640 × 360<br>
-        补零至 64 倍数：640 × 384<br>
-        模型输入张量：(1, 20, 384, 640)<br>
-        <span class="comment">// 20ch = 2极性 × 10时间bin</span>
-      </div>
-    </div>
-  </div>
+  <p class="note" style="margin-top:10px;">GFLOPS = 2 × GMAC（每个 MAC 含 1 次乘法与 1 次加法）。计算量与输入像素数近似线性，约 35 GMAC / 百万像素。</p>
 </section>
 
-<!-- ===== 7. NPU 算力换算 ===== -->
+<!-- 4. 准确率 -->
 <section class="section">
-  <h2 class="section-title">NPU 算力换算（CV184XH 平台）</h2>
-  <p class="section-desc">从 GPU FLOPS 到 NPU TOPS 的推导过程</p>
+  <h2>检测准确率</h2>
+  <p class="desc">以下数值均引自论文原文，评测集为 Prophesee 1 Mpx Automotive 官方测试集；mAP 按 COCO 协议计算</p>
 
-  <div class="card" style="margin-bottom:20px;">
-    <h3>换算公式与推导</h3>
-    <p style="font-size:14px;margin-bottom:12px;">NPU 厂商（如算能 Sophgo）通常以 <strong>INT8 TOPS</strong>（Tera <em>Operations</em> Per Second）标定算力。换算关键约定：</p>
-    <div class="formula">
-      <span class="comment">// 约定：1 MAC（乘加运算）= 1 OP（NPU 厂商 INT8 口径）</span><br>
-      <br>
-      算力需求 (TOPS) = GMAC/帧 × 目标帧率 (fps) ÷ 1000<br>
-      <br>
-      <span class="comment">// RVT-S @25fps：</span><br>
-      = 8.740 GMAC × 25 fps ÷ 1000<br>
-      = 0.219 TOPS
-    </div>
-    <p style="font-size:13px;color:var(--subtext);margin-top:12px;">
-      注：GPU 中 1 FLOP = 1 次浮点运算，1 MAC = 2 FLOP（1 乘 + 1 加），所以 GFLOPS ≈ 2 × GMAC。
-      但 NPU INT8 通常将 1 MAC 计为 1 OP，因此用 <strong>GMAC（非 GFLOPS）</strong>乘以帧率。
-    </p>
-  </div>
-
-  <div class="tbl-wrap" style="margin-bottom:20px;">
+  <div class="tbl-wrap">
     <table>
-      <tr>
-        <th>配置</th>
-        <th class="num">GMAC/帧</th>
-        <th class="num">目标帧率</th>
-        <th class="num">所需算力 (TOPS)</th>
-        <th class="num">占 CV184XH 1.5T 预算</th>
-      </tr>
-      <tr>
-        <td><strong>RVT-S @25fps</strong> <span class="tag">本项目</span></td>
-        <td class="num">8.740</td>
-        <td class="num">25</td>
-        <td class="num good"><strong>0.219</strong></td>
-        <td class="num good"><strong>14.6%</strong></td>
-      </tr>
-      <tr>
-        <td>RVT-S @50fps</td>
-        <td class="num">8.740</td>
-        <td class="num">50</td>
-        <td class="num">0.437</td>
-        <td class="num">29.1%</td>
-      </tr>
-      <tr>
-        <td>RVT-T @25fps</td>
-        <td class="num">4.128</td>
-        <td class="num">25</td>
-        <td class="num good">0.103</td>
-        <td class="num good">6.9%</td>
-      </tr>
-      <tr>
-        <td>RVT-S @25fps（半分辨率 320×192）</td>
-        <td class="num">~2.2</td>
-        <td class="num">25</td>
-        <td class="num">~0.055</td>
-        <td class="num">~3.7%</td>
-      </tr>
+      <thead>
+        <tr>
+          <th>模型</th>
+          <th class="r">mAP@50:95</th>
+          <th class="r">mAP@50</th>
+          <th>来源</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="em">RVT-S</td>
+          <td class="r hi">0.441</td>
+          <td class="r">—</td>
+          <td>Gehrig &amp; Scaramuzza, CVPR 2023, Table 1</td>
+        </tr>
+        <tr>
+          <td>RVT-T</td>
+          <td class="r">0.415</td>
+          <td class="r">—</td>
+          <td>同上</td>
+        </tr>
+        <tr>
+          <td>RVT-B</td>
+          <td class="r">0.474</td>
+          <td class="r">—</td>
+          <td>同上</td>
+        </tr>
+      </tbody>
     </table>
   </div>
 
-  <p style="font-size:13px;color:var(--subtext);margin-bottom:12px;"><strong style="color:var(--text)">各模型 NPU 算力占用可视化</strong>（目标帧率 25 fps，CV184XH 总预算 1.5 TOPS）：</p>
-  <div class="bar-row">
-    <div class="bar-label">RVT-S @25fps</div>
-    <div class="bar-track">
-      <div class="bar-fill" style="width:14.6%;background:linear-gradient(90deg,#4f9cf9,#7c5cbf)">14.6%</div>
-    </div>
-    <div class="bar-pct">0.219 T</div>
-  </div>
-  <div class="bar-row">
-    <div class="bar-label">RVT-T @25fps</div>
-    <div class="bar-track">
-      <div class="bar-fill" style="width:6.9%;background:linear-gradient(90deg,#34c990,#4f9cf9)">6.9%</div>
-    </div>
-    <div class="bar-pct">0.103 T</div>
-  </div>
-  <div class="bar-row">
-    <div class="bar-label">剩余预算（RVT-S 后）</div>
-    <div class="bar-track">
-      <div class="bar-fill" style="width:85.4%;background:rgba(255,255,255,0.05);color:var(--subtext)">剩余 85.4%</div>
-    </div>
-    <div class="bar-pct">1.281 T</div>
-  </div>
-
-  <div class="callout good" style="margin-top:16px;">
-    RVT-S 仅占用 CV184XH 1.5 TOPS 预算的 <strong>14.6%</strong>，算力极为充裕。
-    即使考虑量化误差，INT8 精度下仍有 80%+ 裕量用于前处理、后处理及其他模块。
+  <div class="note warn" style="margin-top:16px;">
+    <strong>说明：</strong>上述准确率对应行车前视视角。本项目目标场景为固定安装摄像头（俯视监控视角），
+    视角差异显著，预训练模型在该场景下检测效果下降明显（见第 6 节实验结果）。
+    达到实用精度需在目标场景数据上进行微调。
   </div>
 </section>
 
-<!-- ===== 8. 行车检测结果图 ===== -->
+<!-- 5. 运行性能与算力核算 -->
 <section class="section">
-  <h2 class="section-title">行车场景检测结果</h2>
-  <p class="section-desc">序列：Moorea 2019-06-14（1Mpx Automotive 训练集，1198 帧 / 60 s）· RVT-S 推理 · score ≥ 0.30</p>
-  <div class="gallery">
-    <div class="gallery-item">
-      <img src="assets/images/driving/01_t000s_city_dusk_cars.png" alt="城市黄昏多车检测" loading="lazy">
-      <div class="cap">
-        <strong>t = 0 s · 城市黄昏多车</strong>
-        蓝色框为汽车（car），绿色框为行人（pedestrian）。黄昏低光照场景事件密度适中。
-      </div>
-    </div>
-    <div class="gallery-item">
-      <img src="assets/images/driving/02_t015s_sparse_static_memory.png" alt="稀疏静止场景时序记忆" loading="lazy">
-      <div class="cap">
-        <strong>t = 15 s · 稀疏场景 + 时序记忆</strong>
-        几乎无前景事件时，ConvLSTM 保留上一时刻运动状态，检测框由历史信息驱动。
-      </div>
-    </div>
-    <div class="gallery-item">
-      <img src="assets/images/driving/03_t030s_driving_multi_cars.png" alt="行驶中多车检测" loading="lazy">
-      <div class="cap">
-        <strong>t = 30 s · 行驶中多车同检</strong>
-        3 辆车同时被检出，自车运动产生丰富背景事件，网络依然稳定定位。
-      </div>
-    </div>
-    <div class="gallery-item">
-      <img src="assets/images/driving/04_t039s_intersection.png" alt="路口场景" loading="lazy">
-      <div class="cap">
-        <strong>t = 39 s · 路口交叉场景</strong>
-        路口快速移动目标产生高密度事件，对向来车和行人均被正确框出。
-      </div>
-    </div>
-    <div class="gallery-item">
-      <img src="assets/images/driving/05_t045s_pedestrians.png" alt="行人检测" loading="lazy">
-      <div class="cap">
-        <strong>t = 45 s · 行人优先检测</strong>
-        行人目标尺寸小（AP<sub>small</sub> = 38.6%），近距离行人可稳定检出。
-      </div>
-    </div>
-    <div class="gallery-item">
-      <img src="assets/images/driving/06_t054s_mixed_targets.png" alt="混合目标" loading="lazy">
-      <div class="cap">
-        <strong>t = 54 s · 混合目标场景</strong>
-        行人、两轮车、汽车三类同帧出现，YOLOX 头部三类并行输出，无明显混淆。
-      </div>
-    </div>
+  <h2>运行性能与 NPU 算力核算</h2>
+  <p class="desc">GPU 基准测试硬件：NVIDIA RTX 4060 Laptop（8 GB VRAM）· CUDA 12.6 · PyTorch 2.4 · FP32 · batch = 1 · 单流 RNN 顺序推理</p>
+
+  <div class="tbl-wrap" style="margin-bottom:28px;">
+    <table>
+      <thead>
+        <tr>
+          <th>模型</th>
+          <th class="r">单帧延迟 (ms)</th>
+          <th class="r">吞吐量 (fps)</th>
+          <th class="r">流推理实测 (fps)</th>
+          <th class="r">峰值显存占用 (MB)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="em">RVT-S</td>
+          <td class="r">7.83</td>
+          <td class="r hi">127.7</td>
+          <td class="r hi">112.7</td>
+          <td class="r">224</td>
+        </tr>
+        <tr>
+          <td>RVT-T</td>
+          <td class="r">7.24</td>
+          <td class="r">138.1</td>
+          <td class="r">114.1</td>
+          <td class="r">193</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p style="margin-bottom:10px;font-weight:600;color:var(--heading);font-size:13px;">NPU 等效算力换算（目标平台：CV184XH，INT8，1.5 TOPS）</p>
+  <p style="margin-bottom:12px;font-size:13px;">
+    算能 Sophgo 等 NPU 厂商以 INT8 TOPS 标定峰值算力，换算约定为 1 MAC = 1 OP。
+    因此从 FlopCountAnalysis 所得 GMAC 值换算如下：
+  </p>
+
+  <div class="formula">
+    NPU 算力需求 (TOPS) = GMAC/帧 &times; 目标帧率 (fps) &divide; 1000<br>
+    <br>
+    <span class="cmt">RVT-S，目标帧率 25 fps：</span><br>
+    = 8.740 GMAC &times; 25 fps &divide; 1000 = <strong>0.219 TOPS</strong><br>
+    <br>
+    <span class="cmt">占 CV184XH 1.5 TOPS INT8 预算比例：0.219 / 1.5 = 14.6%</span>
+  </div>
+
+  <div class="note" style="margin-top:4px;">
+    GPU 侧 1 FLOP 为单次浮点运算，1 MAC = 2 FLOP，故 GFLOPS = 2 × GMAC。
+    NPU INT8 口径中 1 MAC 记为 1 OP，换算时应使用 GMAC 而非 GFLOPS。
+  </div>
+
+  <div class="tbl-wrap" style="margin-top:20px;">
+    <table>
+      <thead>
+        <tr>
+          <th>配置</th>
+          <th class="r">GMAC / 帧</th>
+          <th class="r">目标帧率 (fps)</th>
+          <th class="r">所需算力 (TOPS)</th>
+          <th class="r">占 1.5 TOPS 预算</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="em">RVT-S · 25 fps（设计基准）</td>
+          <td class="r">8.740</td>
+          <td class="r">25</td>
+          <td class="r hi">0.219</td>
+          <td class="r hi">14.6%</td>
+        </tr>
+        <tr>
+          <td>RVT-T · 25 fps</td>
+          <td class="r">4.128</td>
+          <td class="r">25</td>
+          <td class="r">0.103</td>
+          <td class="r">6.9%</td>
+        </tr>
+        <tr>
+          <td>RVT-S · 50 fps</td>
+          <td class="r">8.740</td>
+          <td class="r">50</td>
+          <td class="r">0.437</td>
+          <td class="r">29.1%</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </section>
 
-<!-- ===== 9. 行车检测视频 ===== -->
+<!-- 6. 行车场景检测结果 -->
 <section class="section">
-  <h2 class="section-title">行车场景检测演示视频</h2>
-  <p class="section-desc">1198 帧完整序列 @20fps · 2× 上采样显示（实际推理分辨率 640×384）</p>
-  <div class="video-grid">
-    <div class="video-card">
-      <video controls preload="none" poster="">
+  <h2>行车场景检测结果</h2>
+  <p class="desc">
+    数据序列：Moorea 2019-06-14（1 Mpx Automotive 训练集，1198 帧 / 60 s）·
+    RVT-S 预训练权重直接推理 · 置信度阈值 0.30
+  </p>
+
+  <div class="gallery" style="margin-bottom:28px;">
+    <div class="gitem">
+      <img src="assets/images/driving/01_t000s_city_dusk_cars.png" alt="" loading="lazy">
+      <div class="cap"><strong>t = 0 s · 城市黄昏，多车场景</strong>蓝框为汽车，绿框为行人。低照度下事件密度适中，检测稳定。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/driving/02_t015s_sparse_static_memory.png" alt="" loading="lazy">
+      <div class="cap"><strong>t = 15 s · 稀疏事件，时序记忆</strong>前景事件极少时，ConvLSTM 隐状态保留历史运动信息，检测框由时序记忆驱动。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/driving/03_t030s_driving_multi_cars.png" alt="" loading="lazy">
+      <div class="cap"><strong>t = 30 s · 行驶中多车同帧检出</strong>自车运动产生丰富背景事件，3 辆车同时稳定定位。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/driving/04_t039s_intersection.png" alt="" loading="lazy">
+      <div class="cap"><strong>t = 39 s · 路口交叉场景</strong>高密度事件区域，对向来车与行人均被正确框出。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/driving/05_t045s_pedestrians.png" alt="" loading="lazy">
+      <div class="cap"><strong>t = 45 s · 行人检测</strong>小尺寸目标（AP<sub>small</sub> = 38.6%），近距离行人可稳定检出。</div>
+    </div>
+    <div class="gitem">
+      <img src="assets/images/driving/06_t054s_mixed_targets.png" alt="" loading="lazy">
+      <div class="cap"><strong>t = 54 s · 三类目标混合</strong>行人、两轮车、汽车同帧出现，YOLOX 解耦头三类并行输出，无明显混淆。</div>
+    </div>
+  </div>
+
+  <p style="font-size:13px;font-weight:600;color:var(--heading);margin-bottom:14px;">完整序列检测演示视频（1198 帧 · 60 s · @20 fps · 显示 2× 上采样）</p>
+  <div class="vgrid">
+    <div class="vcard">
+      <video controls preload="none">
         <source src="assets/videos/rvt-s_moorea_demo.mp4" type="video/mp4">
       </video>
       <div class="vcap">
-        <strong>RVT-S 行车检测演示（60 秒）</strong>
-        <span>9.87M 参数 · 8.74 GMAC/帧 · GPU 实测 112.7 fps</span>
+        <strong>RVT-S 行车检测演示</strong>
+        <span>9.87M 参数 · 8.74 GMAC/帧 · 实测 112.7 fps</span>
       </div>
     </div>
-    <div class="video-card">
-      <video controls preload="none" poster="">
+    <div class="vcard">
+      <video controls preload="none">
         <source src="assets/videos/rvt-t_moorea_demo.mp4" type="video/mp4">
       </video>
       <div class="vcap">
-        <strong>RVT-T 行车检测演示（对比版）</strong>
-        <span>4.41M 参数 · 4.13 GMAC/帧 · mAP-50 比 RVT-S 低 ~9%</span>
+        <strong>RVT-T 行车检测演示（对比）</strong>
+        <span>4.41M 参数 · 4.13 GMAC/帧 · mAP 低约 2.6 pp</span>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ===== 10. 静态摄像头实验 ===== -->
+<!-- 7. 静态摄像头场景实验 -->
 <section class="section">
-  <h2 class="section-title">静态摄像头适应性实验</h2>
-  <p class="section-desc">使用 Prophesee IMX636 实拍 RAW 数据（EVT3 格式），模拟固定安装监控场景</p>
+  <h2>静态摄像头场景适应性实验</h2>
+  <p class="desc">
+    数据来源：Prophesee IMX636 实拍 EVT3 格式 RAW 文件，模拟固定安装监控场景
+  </p>
 
-  <div class="callout warn" style="margin-bottom:20px;">
-    <strong>域偏移说明：</strong> RVT-S 预训练于前视行车视角，直接迁移到静止摄像头（鸟瞰视角）存在：
-    （1）<strong>位置先验偏移</strong>——训练时目标主要出现在画面中部，网络倾向在中间位置检测；
-    （2）<strong>视角偏移</strong>——行车视角目标侧面显著，鸟瞰视角目标顶部显著，形状特征不同；
-    （3）<strong>幻影行检测</strong>——IMX636 传感器噪声行特性与行车数据分布不同，触发误检。
+  <div class="note warn" style="margin-bottom:20px;">
+    <strong>域偏移分析：</strong>预训练数据为行车前视视角，迁移至固定俯视摄像头时存在三类偏移：
+    （1）位置先验偏移，训练集目标集中于画面中部，网络对画面边缘目标响应弱；
+    （2）视角偏移，俯视视角下目标外观（顶部特征）与训练分布（侧面特征）差异显著；
+    （3）传感器噪声特性差异，IMX636 存在整行噪声事件，预训练数据中无此类样本，导致误检。
   </div>
 
   <div class="gallery" style="margin-bottom:28px;">
-    <div class="gallery-item">
-      <img src="assets/images/static/01_RAW_pedestrians_t12s_phantom_row_visible.png" alt="幻影行可见" loading="lazy">
-      <div class="cap">
-        <strong>⚠ 幻影行误检（未过滤）</strong>
-        传感器噪声触发整行事件，被网络误识别为连续横向目标（幻影检测）。
-      </div>
+    <div class="gitem">
+      <img src="assets/images/static/01_RAW_pedestrians_t12s_phantom_row_visible.png" alt="" loading="lazy">
+      <div class="cap"><strong>幻影行误检（未过滤）</strong>传感器整行噪声事件被网络误识别为连续横向目标。</div>
     </div>
-    <div class="gallery-item">
-      <img src="assets/images/static/02_GATED_pedestrians_t10s_some_phantoms_remain.png" alt="门控后仍有幻影" loading="lazy">
-      <div class="cap">
-        <strong>事件密度门控后（部分幻影残留）</strong>
-        对检测框内事件密度设置下限阈值，过滤大部分幻影，但仍有低密度残留。
-      </div>
+    <div class="gitem">
+      <img src="assets/images/static/02_GATED_pedestrians_t10s_some_phantoms_remain.png" alt="" loading="lazy">
+      <div class="cap"><strong>事件密度门控后（残留幻影）</strong>对检测框内事件密度设下限阈值后，大部分幻影被过滤，仍有低密度残留。</div>
     </div>
-    <div class="gallery-item">
-      <img src="assets/images/static/03_GATED_pedestrians_t30s_true_person_missed_below.png" alt="真实行人漏检" loading="lazy">
-      <div class="cap">
-        <strong>⚠ 真实行人漏检</strong>
-        相机位置偏低时，缓慢行走的行人事件密度不足，被门控阈值误滤，出现漏检。
-      </div>
+    <div class="gitem">
+      <img src="assets/images/static/03_GATED_pedestrians_t30s_true_person_missed_below.png" alt="" loading="lazy">
+      <div class="cap"><strong>真实行人漏检</strong>缓慢移动的行人事件密度低，被门控阈值误滤，出现漏检。</div>
     </div>
-    <div class="gallery-item">
-      <img src="assets/images/static/04_GATED_pedestrians_t40s_real_person_right_detected.png" alt="右侧行人正确检测" loading="lazy">
-      <div class="cap">
-        <strong>✅ 快速移动行人正确检测</strong>
-        移动速度较快的行人产生足够事件，门控后依然成功检出，置信度 &gt; 0.5。
-      </div>
+    <div class="gitem">
+      <img src="assets/images/static/04_GATED_pedestrians_t40s_real_person_right_detected.png" alt="" loading="lazy">
+      <div class="cap"><strong>快速移动行人正确检出</strong>移动速度较快时事件密度充足，门控后仍可稳定检出。</div>
     </div>
-    <div class="gallery-item">
-      <img src="assets/images/static/05_TRAFFIC_birdseye_8_cars_only_1_misdetected.png" alt="鸟瞰交通场景" loading="lazy">
-      <div class="cap">
-        <strong>⚠ 鸟瞰交通场景（8车仅检出1辆）</strong>
-        鸟瞰视角下车辆外观与训练数据差异极大，8 辆车仅 1 辆被误检出（置信度低）。
-      </div>
+    <div class="gitem">
+      <img src="assets/images/static/05_TRAFFIC_birdseye_8_cars_only_1_misdetected.png" alt="" loading="lazy">
+      <div class="cap"><strong>俯视交通场景（8 车仅检出 1 辆）</strong>俯视视角车辆外观与训练分布差异极大，检测率极低。</div>
     </div>
-    <div class="gallery-item">
-      <img src="assets/images/static/06_TRAFFIC_birdseye_no_detections.png" alt="无检测" loading="lazy">
-      <div class="cap">
-        <strong>鸟瞰场景零检测帧</strong>
-        大多数帧无任何检测输出，说明未经微调的模型对鸟瞰视角泛化极差。
-      </div>
+    <div class="gitem">
+      <img src="assets/images/static/06_TRAFFIC_birdseye_no_detections.png" alt="" loading="lazy">
+      <div class="cap"><strong>俯视场景零检测帧</strong>多数帧无任何输出，证明未经适应的预训练模型对俯视视角泛化能力不足。</div>
     </div>
   </div>
 
-  <h3 style="font-size:15px;color:var(--heading);margin-bottom:16px;">静态摄像头检测演示视频</h3>
-  <div class="video-grid">
-    <div class="video-card">
+  <p style="font-size:13px;font-weight:600;color:var(--heading);margin-bottom:14px;">静态摄像头检测演示视频</p>
+  <div class="vgrid">
+    <div class="vcard">
       <video controls preload="none">
         <source src="assets/videos/rvt-s_STATIC_pedestrians.mp4" type="video/mp4">
       </video>
       <div class="vcap">
         <strong>行人场景（原始，含幻影误检）</strong>
-        <span>可见幻影行被大量误检为连续横向目标</span>
+        <span>大量整行噪声事件触发误检</span>
       </div>
     </div>
-    <div class="video-card">
+    <div class="vcard">
       <video controls preload="none">
         <source src="assets/videos/rvt-s_STATIC_pedestrians_clean.mp4" type="video/mp4">
       </video>
       <div class="vcap">
         <strong>行人场景（事件密度门控后）</strong>
-        <span>幻影大幅减少，真实行人在快速移动时可检出</span>
+        <span>幻影显著减少；快速移动行人可检出</span>
       </div>
     </div>
-    <div class="video-card">
+    <div class="vcard">
       <video controls preload="none">
         <source src="assets/videos/rvt-s_STATIC_traffic.mp4" type="video/mp4">
       </video>
       <div class="vcap">
-        <strong>鸟瞰交通场景</strong>
-        <span>预训练模型对鸟瞰视角泛化极差，几乎无有效检测</span>
+        <strong>俯视交通场景</strong>
+        <span>预训练模型在俯视视角下几乎无有效检测</span>
       </div>
     </div>
   </div>
-
-  <div class="callout" style="margin-top:20px;">
-    <strong>结论：</strong> 上述实验验证了项目采用 YOLOv8n-EV 专门针对静态固定摄像头视角进行设计和微调的必要性。
-    RVT 作为 baseline 已证明事件相机检测在算力和速度上完全满足要求，核心工作是在目标场景数据上进行迁移学习。
-  </div>
 </section>
 
-<!-- ===== 11. 综合对比 ===== -->
+<!-- 8. 参考文献 -->
 <section class="section">
-  <h2 class="section-title">综合指标对比</h2>
-  <p class="section-desc">与项目设计目标的差距分析</p>
-  <div class="tbl-wrap">
-    <table>
-      <tr>
-        <th>指标维度</th>
-        <th>RVT-S（预训练直接推理）</th>
-        <th>项目设计目标</th>
-        <th>状态</th>
-      </tr>
-      <tr>
-        <td>算力需求 @25fps</td>
-        <td>0.219 TOPS INT8</td>
-        <td>≤ 1.5 TOPS</td>
-        <td class="good">✅ 充裕（14.6%）</td>
-      </tr>
-      <tr>
-        <td>实时帧率</td>
-        <td>112～128 fps（GPU FP32）</td>
-        <td>≥ 25 fps</td>
-        <td class="good">✅ 超越 4×</td>
-      </tr>
-      <tr>
-        <td>VRAM 占用</td>
-        <td>224 MB（峰值）</td>
-        <td>嵌入式可接受</td>
-        <td class="good">✅ 轻量</td>
-      </tr>
-      <tr>
-        <td>mAP-50（官方测试集）</td>
-        <td>71.7%</td>
-        <td>≥ 90%</td>
-        <td class="warn">⚠ 差 18%（需微调）</td>
-      </tr>
-      <tr>
-        <td>静态摄像头鸟瞰视角</td>
-        <td>极差（零检测为主）</td>
-        <td>可用</td>
-        <td class="bad">❌ 需域适应微调</td>
-      </tr>
-      <tr>
-        <td>幻影噪声抑制</td>
-        <td>门控后部分改善</td>
-        <td>生产可用</td>
-        <td class="warn">⚠ 仍需后处理</td>
-      </tr>
-    </table>
+  <h2>参考文献</h2>
+  <div style="font-size:13px;color:var(--subtext);line-height:2.2;">
+    <p>[1] Gehrig, M., &amp; Scaramuzza, D. (2023). <em>Recurrent Vision Transformers for Object Detection with Event Cameras.</em> CVPR 2023.
+      &nbsp;<a href="https://github.com/uzh-rpg/RVT" target="_blank">github.com/uzh-rpg/RVT</a></p>
+    <p>[2] Perot, E., et al. (2020). <em>Learning to Detect Objects with a 1 Megapixel Event Camera.</em> NeurIPS 2020.</p>
+    <p>[3] Finateu, T., et al. (2020). <em>A 1280×720 Back-Illuminated Stacked Temporal Contrast Event-Driven Image Sensor.</em> ISSCC 2020, Paper 5.10.</p>
+    <p>[4] Tu, R., et al. (2022). <em>MaxViT: Multi-Axis Vision Transformer.</em> ECCV 2022.</p>
   </div>
 </section>
 
-<!-- ===== 12. 参考文献 ===== -->
-<section class="section">
-  <h2 class="section-title">参考文献</h2>
-  <div class="card" style="font-size:13px;color:var(--subtext);line-height:2.2;">
-    <p>[1] Gehrig, M., &amp; Scaramuzza, D. (2023). <em>Recurrent Vision Transformers for Object Detection with Event Cameras.</em> CVPR 2023. <a href="https://github.com/uzh-rpg/RVT" target="_blank">GitHub</a></p>
-    <p>[2] Perot, E., et al. (2020). <em>Learning to Detect Objects with a 1 Megapixel Event Camera.</em> NeurIPS 2020. （1Mpx Automotive Dataset）</p>
-    <p>[3] Finateu, T., et al. (2020). <em>A 1280×720 Back-Illuminated Stacked Temporal Contrast Event-Driven Image Sensor.</em> ISSCC 2020 Paper 5.10. （IMX636 原型传感器）</p>
-    <p>[4] Tu, R., et al. (2022). <em>MaxViT: Multi-Axis Vision Transformer.</em> ECCV 2022. （RVT 主干网络）</p>
-  </div>
-</section>
-
-</div><!-- /container -->
+</div><!-- /page -->
 
 <footer>
-  <div class="container">
-    实验时间：2026-05-14 &nbsp;·&nbsp;
-    GPU 平台：NVIDIA RTX 4060 Laptop（8GB）&nbsp;·&nbsp;
-    框架：PyTorch 2.4 + CUDA 12.6<br>
-    数据集：Prophesee 1 Mpx Automotive Detection Dataset（CC BY-NC-SA）&nbsp;·&nbsp;
-    模型权重：<a href="https://github.com/uzh-rpg/RVT" target="_blank">uzh-rpg/RVT</a>（MIT License）
-  </div>
+  测试平台：NVIDIA RTX 4060 Laptop GPU（8 GB）· CUDA 12.6 · PyTorch 2.4 &nbsp;|&nbsp;
+  数据集：Prophesee 1 Mpx Automotive Detection Dataset（CC BY-NC-SA）&nbsp;|&nbsp;
+  模型权重：<a href="https://github.com/uzh-rpg/RVT" target="_blank">uzh-rpg/RVT</a>（MIT License）&nbsp;|&nbsp;
+  更新：2026-05-14
 </footer>
 
 </body>
